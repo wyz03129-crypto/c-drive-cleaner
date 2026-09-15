@@ -62,7 +62,10 @@ class StorageAnalyzer:
                                 continue
                             if not stat.S_ISREG(info.st_mode):
                                 continue
-                            if info.st_nlink > 1:
+                            # Windows does not reliably expose st_nlink, while
+                            # st_ino is the NTFS file index. Track every Windows
+                            # identity; on POSIX retain only possible hard links.
+                            if os.name == "nt" or info.st_nlink > 1:
                                 identity = (info.st_dev, info.st_ino)
                                 if identity in seen_files:
                                     duplicate_bytes += info.st_size
