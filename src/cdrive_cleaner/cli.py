@@ -27,7 +27,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "status":
-        print("C Drive Cleaner v2：M0 工程骨架已就绪，真实扫描和清理尚未启用。")
+        print("C Drive Cleaner v2：M1 安全内核已就绪，用户扫描和清理入口尚未启用。")
         return 0
     parser.print_help()
     return 0

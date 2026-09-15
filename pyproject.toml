@@ -40,6 +40,9 @@ package-dir = { "" = "src" }
 where = ["src"]
 include = ["cdrive_cleaner*"]
 
+[tool.setuptools.package-data]
+cdrive_cleaner = ["py.typed"]
+
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers --cov=cdrive_cleaner --cov-report=term-missing"
 testpaths = ["tests"]
@@ -65,3 +68,5 @@ ignore = ["RUF001"]
 python_version = "3.12"
 strict = true
 files = ["src/cdrive_cleaner", "scripts"]
+mypy_path = "src"
+explicit_package_bases = true

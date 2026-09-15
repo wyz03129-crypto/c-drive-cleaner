@@ -7,7 +7,7 @@ from cdrive_cleaner.cli import main
 def test_status_is_explicitly_non_operational(capsys: object) -> None:
     assert main(["status"]) == 0
     output = capsys.readouterr().out  # type: ignore[attr-defined]
-    assert "M0" in output
+    assert "M1" in output
     assert "尚未启用" in output
 
 
