@@ -13,7 +13,7 @@
 - CleanupPlanner 严格匹配规则 ID、版本、风险、动作类型和授权根；
 - DirectFileDeleteExecutor 执行时重新授权；
 - 默认脱敏的 JSON Lines 审计日志；
-- 静态门禁确保删除调用只能位于批准的 executor 或旧版临时兼容网关。
+- 静态门禁确保删除调用只能位于批准的 executor 网关。
 
 ## 用户入口状态
 
@@ -34,4 +34,3 @@ M1 不向 GUI 或 CLI 暴露文件扫描和真实清理。真实删除只在 pyt
 - mutation gate 通过；
 - 构建成功；
 - GitHub Windows CI 成功。
-

@@ -9,12 +9,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = ROOT / "src"
 
-# The v1 gateway remains temporarily approved until M1 replaces it. Future v2
-# mutations must live below cdrive_cleaner/executors and remain policy-reviewed.
-APPROVED_PREFIXES = (
-    Path("src/safety.py"),
-    Path("src/cdrive_cleaner/executors"),
-)
+# Filesystem mutations must stay in the policy-reviewed executor gateway.
+APPROVED_PREFIXES = (Path("src/cdrive_cleaner/executors"),)
 
 MUTATING_CALLS = {
     "os.remove",

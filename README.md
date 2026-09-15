@@ -2,7 +2,7 @@
 
 C Drive Cleaner 是一个面向普通 Windows 用户的 C 盘空间分析与安全清理项目。
 
-当前里程碑是 **M5 未签名 Beta 候选版**。现有 v1.1 源码只用于迁移和行为对照；正式发布前仍需代码签名及真实 Windows 10/11 环境验收。
+当前里程碑是 **M5 未签名 Beta 候选版**。v1.1 迁移已经完成，仓库只保留 v2 生产源码；正式发布前仍需代码签名及真实 Windows 10/11 环境验收。
 
 ## 项目目标
 
@@ -89,7 +89,6 @@ python -m cdrive_cleaner advanced run clean_component_store --confirm "CLEAN COM
 - `docs/ARCHITECTURE_V2.md`
 - `docs/SAFETY_MODEL_V2.md`
 - `docs/ROADMAP_AND_ACCEPTANCE.md`
-- `docs/LEGACY_MIGRATION.md`
 - `docs/M1_IMPLEMENTATION.md`
 - `docs/M2_IMPLEMENTATION.md`
 - `docs/M3_IMPLEMENTATION.md`
@@ -99,5 +98,4 @@ python -m cdrive_cleaner advanced run clean_component_store --confirm "CLEAN COM
 ## 安全声明
 
 M5 仍是未签名 Beta 候选版，并非正式发布版。CLI 保留 Dry Run 供自动化与技术复核；GUI
-采用“扫描 → 选择 → 一次确认 → 真实清理 → 验证”的流程。旧版入口仍位于 `src/main.py`，
-仅用于迁移对照，不属于新包入口。
+采用“扫描 → 选择 → 一次确认 → 真实清理 → 验证”的流程。
