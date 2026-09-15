@@ -33,4 +33,11 @@ jobs:
       - name: Enforce release gate
         run: python scripts/release_gate.py
       - name: Audit Python dependencies
-        run: python -m pip_audit
+        shell: pwsh
+        run: |
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            python -m pip_audit
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            if ($attempt -lt 3) { Start-Sleep -Seconds (10 * $attempt) }
+          }
+          exit 1
