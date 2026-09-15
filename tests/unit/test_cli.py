@@ -13,15 +13,15 @@ from cdrive_cleaner.safety import SafetyPolicy
 from cdrive_cleaner.windows import KnownFolders
 
 
-def test_status_reports_m2(capsys: object) -> None:
+def test_status_reports_m5(capsys: object) -> None:
     assert main(["status"]) == 0
     output = capsys.readouterr().out  # type: ignore[attr-defined]
-    assert "M3" in output
+    assert "M5" in output
     assert "已启用" in output
 
 
-def test_package_version_matches_alpha_line() -> None:
-    assert __version__ == "2.0.0a0"
+def test_package_version_matches_beta_line() -> None:
+    assert __version__ == "2.0.0b1"
 
 
 def test_no_command_prints_help_without_filesystem_work(capsys: object) -> None:

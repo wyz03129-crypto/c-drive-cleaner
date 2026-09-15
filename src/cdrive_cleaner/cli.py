@@ -27,7 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="c-drive-cleaner",
-        description="Windows C 盘空间分析与安全清理工具（v2 工程阶段）",
+        description="Windows C 盘空间分析与安全清理工具（M5 Beta）",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     subcommands = parser.add_subparsers(dest="command")
@@ -73,12 +73,12 @@ def _runtime() -> tuple[KnownFolders, RuleRegistry, SafetyPolicy]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run the M2 CLI with explicit selection and confirmation for mutation."""
+    """Run the CLI with explicit selection and confirmation for mutation."""
 
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "status":
-        print("C Drive Cleaner v2：M3 只读空间分析器与 M2 安全清理已启用。")
+        print("C Drive Cleaner v2：M5 GUI、空间分析、安全清理和高级优化已启用。")
         return 0
     if args.command == "recycle-bin":
         try:

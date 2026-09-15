@@ -2,7 +2,7 @@
 
 C Drive Cleaner 是一个面向普通 Windows 用户的 C 盘空间分析与安全清理项目。
 
-当前分支处于 **v2.0.0-alpha 工程重构阶段**。现有 v1.1 源码保留用于迁移和行为对照，不能视为正式发行版本，也不建议直接用于重要电脑的深度清理。
+当前里程碑是 **M5 未签名 Beta 候选版**。现有 v1.1 源码只用于迁移和行为对照；正式发布前仍需代码签名及真实 Windows 10/11 环境验收。
 
 ## 项目目标
 
@@ -23,7 +23,24 @@ C Drive Cleaner 是一个面向普通 Windows 用户的 C 盘空间分析与安�
 | 快速扫描与首批清理规则 | M2 CLI MVP |
 | 深度空间分析 | M3 CLI MVP |
 | Windows 高级空间优化 | M4 CLI MVP |
-| 正式 GUI 和 EXE | 尚未实现 |
+| 正式 GUI 和 EXE | M5 Beta 候选版 |
+
+## 桌面版
+
+```powershell
+python -m pip install -e ".[gui]"
+c-drive-cleaner-gui
+```
+
+本地构建单文件 EXE：
+
+```powershell
+python -m pip install -e ".[dev,packaging]"
+.\scripts\build_exe.ps1
+```
+
+输出为 `dist/CDriveCleaner.exe` 和 SHA-256 校验文件。GitHub Actions 的
+`Build Windows EXE` 工作流也会生成可下载的未签名构建产物。
 
 ## 开发检查
 
@@ -46,7 +63,7 @@ python scripts/check_mutation_gate.py
 .\scripts\check.ps1
 ```
 
-## 运行 M2 CLI
+## 命令行工具
 
 ```powershell
 python -m cdrive_cleaner --version
@@ -77,8 +94,10 @@ python -m cdrive_cleaner advanced run clean_component_store --confirm "CLEAN COM
 - `docs/M2_IMPLEMENTATION.md`
 - `docs/M3_IMPLEMENTATION.md`
 - `docs/M4_IMPLEMENTATION.md`
+- `docs/M5_IMPLEMENTATION.md`
 
 ## 安全声明
 
-M2 是供测试的 CLI MVP，并非正式发布版。请先运行 Dry Run 并核对规则。旧版入口仍位于
-`src/main.py`，仅用于迁移对照，不属于新包的命令入口。
+M5 仍是未签名 Beta 候选版，并非正式发布版。CLI 保留 Dry Run 供自动化与技术复核；GUI
+采用“扫描 → 选择 → 一次确认 → 真实清理 → 验证”的流程。旧版入口仍位于 `src/main.py`，
+仅用于迁移对照，不属于新包入口。
