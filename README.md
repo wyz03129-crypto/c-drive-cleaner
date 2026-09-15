@@ -22,6 +22,7 @@ C Drive Cleaner 是一个面向普通 Windows 用户的 C 盘空间分析与安�
 | 安全内核 v2 | M1 已完成 |
 | 快速扫描与首批清理规则 | M2 CLI MVP |
 | 深度空间分析 | M3 CLI MVP |
+| Windows 高级空间优化 | M4 CLI MVP |
 | 正式 GUI 和 EXE | 尚未实现 |
 
 ## 开发检查
@@ -57,6 +58,9 @@ python -m cdrive_cleaner clean --rule user_temp
 python -m cdrive_cleaner clean --rule user_temp --execute --confirm CLEAN
 python -m cdrive_cleaner recycle-bin
 python -m cdrive_cleaner recycle-bin --empty --confirm "EMPTY RECYCLE BIN"
+python -m cdrive_cleaner advanced inspect
+python -m cdrive_cleaner advanced run analyze_component_store
+python -m cdrive_cleaner advanced run clean_component_store --confirm "CLEAN COMPONENT STORE"
 ```
 
 `clean` 默认是 Dry Run。真实清理必须明确列出规则、增加 `--execute`，并精确输入
@@ -72,6 +76,7 @@ python -m cdrive_cleaner recycle-bin --empty --confirm "EMPTY RECYCLE BIN"
 - `docs/M1_IMPLEMENTATION.md`
 - `docs/M2_IMPLEMENTATION.md`
 - `docs/M3_IMPLEMENTATION.md`
+- `docs/M4_IMPLEMENTATION.md`
 
 ## 安全声明
 

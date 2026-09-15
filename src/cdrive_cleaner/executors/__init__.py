@@ -4,6 +4,7 @@ from .base import ActionExecutor
 from .direct_file import DirectFileDeleteExecutor
 from .models import ExecutionResult, ExecutionStatus
 from .recycle_bin import RecycleBinExecutor, RecycleBinInfo
+from .windows_advanced import WindowsAdvancedExecutor
 
 __all__ = [
     "ActionExecutor",
@@ -12,4 +13,5 @@ __all__ = [
     "ExecutionStatus",
     "RecycleBinExecutor",
     "RecycleBinInfo",
+    "WindowsAdvancedExecutor",
 ]

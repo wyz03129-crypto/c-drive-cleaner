@@ -1,5 +1,6 @@
 """Domain types with no dependency on UI or Windows infrastructure."""
 
+from .advanced import AdvancedAction, CommandResult
 from .models import (
     ActionKind,
     ActionPlan,
@@ -17,8 +18,10 @@ from .storage import AnalysisCoverage, DirectoryUsage, LargeFile, StorageSnapsho
 __all__ = [
     "ActionKind",
     "ActionPlan",
+    "AdvancedAction",
     "AnalysisCoverage",
     "CleanupReceipt",
+    "CommandResult",
     "DirectoryUsage",
     "FileIdentity",
     "Finding",

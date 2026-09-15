@@ -8,10 +8,11 @@ from collections.abc import Sequence
 from contextlib import suppress
 
 from . import __version__
-from .analysis import FastScanner, StorageAnalyzer
+from .analysis import FastScanner, StorageAnalyzer, WindowsAdvancedInspector
 from .app import CleanupCoordinator, CleanupPlanner
-from .domain.errors import UnsupportedPlatformError
-from .executors import DirectFileDeleteExecutor, RecycleBinExecutor
+from .domain import AdvancedAction
+from .domain.errors import SafetyDeniedError, UnsupportedPlatformError
+from .executors import DirectFileDeleteExecutor, RecycleBinExecutor, WindowsAdvancedExecutor
 from .persistence import StorageSnapshotCache
 from .rules import RuleRegistry, build_m2_registry
 from .safety import SafetyPolicy
@@ -42,6 +43,12 @@ def build_parser() -> argparse.ArgumentParser:
     recycle = subcommands.add_parser("recycle-bin", help="独立查询或清空 C 盘回收站")
     recycle.add_argument("--empty", action="store_true", help="清空回收站；省略时只查询")
     recycle.add_argument("--confirm", help="清空时必须精确输入 EMPTY RECYCLE BIN")
+    advanced = subcommands.add_parser("advanced", help="分析或执行 Windows 官方高级操作")
+    advanced_sub = advanced.add_subparsers(dest="advanced_command", required=True)
+    advanced_sub.add_parser("inspect", help="只读检查休眠、分页和虚拟磁盘")
+    run = advanced_sub.add_parser("run", help="运行一个固定的官方操作")
+    run.add_argument("action", choices=[action.value for action in AdvancedAction])
+    run.add_argument("--confirm", default="", help="变更操作所需的专用确认词")
     return parser
 
 
@@ -85,6 +92,28 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(f"回收站：{info.item_count} 项，{_format_bytes(info.size_bytes)}")
             return 0
         except (UnsupportedPlatformError, ValueError, OSError) as error:
+            parser.error(str(error))
+    if args.command == "advanced":
+        try:
+            if args.advanced_command == "inspect":
+                findings = WindowsAdvancedInspector().inspect(discover_known_folders())
+                if not findings:
+                    print("未发现受支持的高级空间项目。")
+                for finding in findings:
+                    print(
+                        f"{finding.category}: {_format_bytes(finding.size_bytes)}  "
+                        f"{finding.path}（{finding.guidance}）"
+                    )
+                return 0
+            result = WindowsAdvancedExecutor().execute(
+                AdvancedAction(args.action), confirmation=args.confirm
+            )
+            if result.stdout:
+                print(result.stdout.rstrip())
+            if result.stderr:
+                print(result.stderr.rstrip())
+            return result.return_code
+        except (UnsupportedPlatformError, SafetyDeniedError, OSError) as error:
             parser.error(str(error))
     if args.command == "analyze":
         try:

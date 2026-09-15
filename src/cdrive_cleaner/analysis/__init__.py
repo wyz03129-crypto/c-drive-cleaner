@@ -2,5 +2,12 @@
 
 from .fast_scan import CancellationToken, FastScanner
 from .storage_analyzer import StorageAnalyzer
+from .windows_advanced import AdvancedFinding, WindowsAdvancedInspector
 
-__all__ = ["CancellationToken", "FastScanner", "StorageAnalyzer"]
+__all__ = [
+    "AdvancedFinding",
+    "CancellationToken",
+    "FastScanner",
+    "StorageAnalyzer",
+    "WindowsAdvancedInspector",
+]
