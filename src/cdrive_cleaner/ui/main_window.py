@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
@@ -39,7 +40,7 @@ from cdrive_cleaner.safety import SafetyPolicy
 from cdrive_cleaner.safety.defaults import build_default_deny_roots
 from cdrive_cleaner.windows import discover_known_folders
 from cdrive_cleaner.windows.disk_space import free_bytes
-from cdrive_cleaner.windows.elevation import is_process_elevated
+from cdrive_cleaner.windows.elevation import is_process_elevated, relaunch_elevated
 
 from .workers import FunctionWorker
 
@@ -147,15 +148,17 @@ class MainWindow(QMainWindow):
         buttons = QHBoxLayout()
         inspect_button = QPushButton("检查高级空间占用")
         component_button = QPushButton("分析组件存储")
+        hibernation_button = QPushButton("关闭休眠并释放空间")
         settings_button = QPushButton("打开存储设置")
         inspect_button.clicked.connect(self._inspect_advanced)
         component_button.clicked.connect(
             lambda: self._run_advanced(AdvancedAction.ANALYZE_COMPONENT_STORE)
         )
+        hibernation_button.clicked.connect(self._confirm_disable_hibernation)
         settings_button.clicked.connect(
             lambda: self._run_advanced(AdvancedAction.OPEN_STORAGE_SETTINGS)
         )
-        for button in (inspect_button, component_button, settings_button):
+        for button in (inspect_button, component_button, hibernation_button, settings_button):
             buttons.addWidget(button)
         self.advanced_output = QTextEdit()
         self.advanced_output.setReadOnly(True)
@@ -216,7 +219,9 @@ class MainWindow(QMainWindow):
             row = self.quick_table.rowCount()
             self.quick_table.insertRow(row)
             choice = QTableWidgetItem()
-            choice.setCheckState(Qt.Checked if rule.risk.value <= 2 else Qt.Unchecked)
+            # Large application-managed caches require a separate, deliberate opt-in.
+            checked = rule.risk.value <= 2 and rule.rule_id != "baidu_accelerate_cache"
+            choice.setCheckState(Qt.Checked if checked else Qt.Unchecked)
             choice.setData(Qt.UserRole, rule.rule_id)
             self.quick_table.setItem(row, 0, choice)
             self.quick_table.setItem(row, 1, QTableWidgetItem(rule.title))
@@ -248,6 +253,16 @@ class MainWindow(QMainWindow):
         )
         if answer != QMessageBox.Yes:
             return
+        if "baidu_accelerate_cache" in selected:
+            phrase, accepted = QInputDialog.getText(
+                self,
+                "专项确认：百度网盘缓存",
+                "请先完全退出百度网盘。此操作会删除可重新生成的加速缓存，"
+                "不会删除网盘云端文件。\n请输入：清理百度缓存",
+            )
+            if not accepted or phrase.strip() != "清理百度缓存":
+                QMessageBox.information(self, "已取消", "专项确认不匹配，未开始清理。")
+                return
         plan = CleanupPlanner(self._registry).build(
             finding for finding in self._snapshot.findings if finding.rule_id in selected
         )
@@ -317,9 +332,59 @@ class MainWindow(QMainWindow):
             )
         )
 
-    def _run_advanced(self, action: AdvancedAction) -> None:
+    def _ensure_elevated(self) -> bool:
+        if is_process_elevated():
+            return True
+        answer = QMessageBox.question(
+            self,
+            "需要管理员权限",
+            "此 Windows 官方操作需要管理员权限。是否现在弹出系统授权窗口并重新启动程序？",
+        )
+        if answer != QMessageBox.Yes:
+            return False
+        if relaunch_elevated():
+            QApplication.quit()
+        else:
+            QMessageBox.critical(
+                self,
+                "提权失败",
+                "无法启动管理员进程，请右键程序并选择以管理员身份运行。",
+            )
+        return False
+
+    def _confirm_disable_hibernation(self) -> None:
+        answer = QMessageBox.warning(
+            self,
+            "关闭 Windows 休眠",
+            "关闭休眠可释放 hiberfil.sys 占用的空间，但会禁用休眠，并可能关闭快速启动。"
+            "这不是普通缓存清理。是否继续？",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer == QMessageBox.Yes:
+            self._run_advanced(
+                AdvancedAction.DISABLE_HIBERNATION,
+                confirmation="DISABLE HIBERNATION",
+            )
+
+    def _run_advanced(self, action: AdvancedAction, *, confirmation: str = "") -> None:
+        if (
+            action
+            in {
+                AdvancedAction.ANALYZE_COMPONENT_STORE,
+                AdvancedAction.CLEAN_COMPONENT_STORE,
+                AdvancedAction.DISABLE_HIBERNATION,
+                AdvancedAction.ENABLE_HIBERNATION,
+                AdvancedAction.LIST_SHADOWS,
+            }
+            and not self._ensure_elevated()
+        ):
+            return
         self.advanced_output.setPlainText("正在调用 Windows 官方工具……")
-        self._run(lambda: WindowsAdvancedExecutor().execute(action), self._advanced_done)
+        self._run(
+            lambda: WindowsAdvancedExecutor().execute(action, confirmation=confirmation),
+            self._advanced_done,
+        )
 
     def _advanced_done(self, value: object) -> None:
         output = getattr(value, "stdout", "") or getattr(value, "stderr", "")

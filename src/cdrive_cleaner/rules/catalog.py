@@ -47,6 +47,37 @@ def _firefox_cache_roots(local: Path) -> tuple[Path, ...]:
         return (profiles / "__unreadable__/cache2",)
 
 
+def _chromium_cache_roots(user_data: Path) -> tuple[Path, ...]:
+    """Discover cache-only children for every ordinary Chromium profile."""
+
+    profile_names = {"default", "guest profile"}
+    try:
+        profiles = tuple(
+            child
+            for child in user_data.iterdir()
+            if child.is_dir()
+            and not child.is_symlink()
+            and not is_reparse_point(child)
+            and (
+                child.name.casefold() in profile_names
+                or child.name.casefold().startswith("profile ")
+            )
+        )
+    except OSError:
+        profiles = ()
+    if not profiles:
+        profiles = (user_data / "Default",)
+    cache_children = (
+        Path("Cache/Cache_Data"),
+        Path("Code Cache"),
+        Path("GPUCache"),
+        Path("DawnCache"),
+        Path("GraphiteDawnCache"),
+        Path("Service Worker/CacheStorage"),
+    )
+    return tuple(profile / child for profile in profiles for child in cache_children)
+
+
 def build_m2_registry(folders: KnownFolders) -> RuleRegistry:
     """Build immutable rules from trusted Known Folder paths, never environment input."""
 
@@ -60,21 +91,13 @@ def build_m2_registry(folders: KnownFolders) -> RuleRegistry:
         _direct(
             "chromium_cache",
             "Chrome 可再生缓存",
-            (
-                local / "Google/Chrome/User Data/Default/Cache/Cache_Data",
-                local / "Google/Chrome/User Data/Default/Code Cache",
-                local / "Google/Chrome/User Data/Default/GPUCache",
-            ),
+            _chromium_cache_roots(local / "Google/Chrome/User Data"),
             risk=RiskLevel.RECOMMENDED,
         ),
         _direct(
             "edge_cache",
             "Edge 可再生缓存",
-            (
-                local / "Microsoft/Edge/User Data/Default/Cache/Cache_Data",
-                local / "Microsoft/Edge/User Data/Default/Code Cache",
-                local / "Microsoft/Edge/User Data/Default/GPUCache",
-            ),
+            _chromium_cache_roots(local / "Microsoft/Edge/User Data"),
             risk=RiskLevel.RECOMMENDED,
         ),
         _direct(
@@ -112,6 +135,12 @@ def build_m2_registry(folders: KnownFolders) -> RuleRegistry:
             "wps_cache",
             "WPS 可再生缓存",
             (roaming / "kingsoft/office6/cache", local / "Kingsoft/WPS Office/cache"),
+            risk=RiskLevel.RECOMMENDED,
+        ),
+        _direct(
+            "baidu_accelerate_cache",
+            "百度网盘加速缓存（需关闭百度网盘）",
+            (roaming / "baidu/BaiduYunKernel/.accelerate",),
             risk=RiskLevel.RECOMMENDED,
         ),
     )

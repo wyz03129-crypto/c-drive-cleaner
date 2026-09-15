@@ -46,6 +46,6 @@ jobs:
           gh release upload "${{ github.event.release.tag_name }}" `
             dist/CDriveCleaner.exe `
             dist/CDriveCleaner.exe.sha256 `
-            dist/CDriveCleaner-Setup-2.0.0-beta.1-unsigned.exe `
-            dist/CDriveCleaner-Setup-2.0.0-beta.1-unsigned.exe.sha256 `
+            dist/CDriveCleaner-Setup-2.0.0-beta.2-unsigned.exe `
+            dist/CDriveCleaner-Setup-2.0.0-beta.2-unsigned.exe.sha256 `
             --clobber

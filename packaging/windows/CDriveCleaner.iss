@@ -1,5 +1,5 @@
 #define AppName "C Drive Cleaner"
-#define AppVersion "2.0.0-beta.1"
+#define AppVersion "2.0.0-beta.2"
 #define AppExeName "CDriveCleaner.exe"
 
 [Setup]
