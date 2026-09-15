@@ -9,6 +9,7 @@ on:
       - "src/cdrive_cleaner/**"
       - "scripts/build_exe.ps1"
       - "scripts/build_installer.ps1"
+      - "scripts/test_installer.ps1"
       - "packaging/windows/**"
       - "scripts/gui_smoke.py"
       - "scripts/release_gate.py"
@@ -47,6 +48,9 @@ jobs:
       - name: Build GUI executable and installer
         shell: pwsh
         run: .\scripts\build_installer.ps1
+      - name: Test silent install and uninstall
+        shell: pwsh
+        run: .\scripts\test_installer.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: CDriveCleaner-windows-unsigned
