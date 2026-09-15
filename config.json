@@ -1,0 +1,24 @@
+{
+  "audit_top_level": true,
+  "top_directory_limit": 20,
+  "large_directory_thresholds_mb": [500, 1024, 5120],
+  "enabled_rule_ids": [
+    "user_temp",
+    "windows_temp",
+    "chrome_cache",
+    "edge_cache",
+    "wps_safe_cache",
+    "wps_review",
+    "office_cache",
+    "pip_cache",
+    "npm_cache",
+    "shader_cache",
+    "crash_dumps",
+    "thumbnail_cache",
+    "windows_error_reporting",
+    "windows_update",
+    "windows_old",
+    "recycle_bin"
+  ],
+  "show_paths_in_console": false
+}
