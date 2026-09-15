@@ -38,7 +38,9 @@ def test_mutating_actions_require_exact_confirmation_and_elevation() -> None:
     def runner(argv: object, timeout: int) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(argv, 0, "", "")  # type: ignore[arg-type]
 
-    executor = WindowsAdvancedExecutor(runner=runner, platform_name="nt")
+    executor = WindowsAdvancedExecutor(
+        runner=runner, elevated_checker=lambda: False, platform_name="nt"
+    )
     with pytest.raises(SafetyDeniedError):
         executor.execute(AdvancedAction.CLEAN_COMPONENT_STORE)
     with pytest.raises(SafetyDeniedError):
