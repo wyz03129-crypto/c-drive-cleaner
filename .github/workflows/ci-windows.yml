@@ -1,0 +1,32 @@
+name: Windows CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install development dependencies
+        run: python -m pip install -e ".[dev]"
+      - name: Lint
+        run: python -m ruff check .
+      - name: Format check
+        run: python -m ruff format --check src/cdrive_cleaner scripts tests
+      - name: Type check
+        run: python -m mypy
+      - name: Test
+        run: python -m pytest
+      - name: Enforce mutation gateway
+        run: python scripts/check_mutation_gate.py
