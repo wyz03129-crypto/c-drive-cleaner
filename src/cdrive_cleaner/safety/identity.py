@@ -6,15 +6,17 @@ import os
 from pathlib import Path
 
 from cdrive_cleaner.domain import FileIdentity
+from cdrive_cleaner.windows.file_identity import file_reference
 
 
 def capture_identity(path: Path) -> FileIdentity:
     """Capture identity without following a final symbolic link."""
 
     details = os.stat(path, follow_symlinks=False)
+    reference = file_reference(path, details)
     return FileIdentity(
-        device=details.st_dev,
-        inode=details.st_ino,
+        device=reference.volume,
+        inode=reference.index,
         size=details.st_size,
         modified_ns=details.st_mtime_ns,
         mode=details.st_mode,

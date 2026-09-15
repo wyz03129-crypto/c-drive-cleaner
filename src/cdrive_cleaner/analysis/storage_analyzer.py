@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from cdrive_cleaner.domain import AnalysisCoverage, DirectoryUsage, LargeFile, StorageSnapshot
+from cdrive_cleaner.windows.file_identity import file_reference
 
 from .fast_scan import CancellationToken
 
@@ -62,11 +63,9 @@ class StorageAnalyzer:
                                 continue
                             if not stat.S_ISREG(info.st_mode):
                                 continue
-                            # Windows does not reliably expose st_nlink, while
-                            # st_ino is the NTFS file index. Track every Windows
-                            # identity; on POSIX retain only possible hard links.
-                            if os.name == "nt" or info.st_nlink > 1:
-                                identity = (info.st_dev, info.st_ino)
+                            reference = file_reference(path, info)
+                            if reference.link_count > 1:
+                                identity = (reference.volume, reference.index)
                                 if identity in seen_files:
                                     duplicate_bytes += info.st_size
                                     continue

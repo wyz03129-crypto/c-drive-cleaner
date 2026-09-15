@@ -10,6 +10,7 @@ from enum import StrEnum
 from pathlib import Path
 
 from cdrive_cleaner.domain import FileIdentity, RiskLevel
+from cdrive_cleaner.windows.file_identity import file_reference
 
 from .identity import capture_identity
 from .path_policy import NormalizedPath, normalize_path
@@ -184,7 +185,7 @@ class SafetyPolicy:
             return SafetyDecision(False, AuthorizationCode.PROJECT_TREE, candidate)
         try:
             current = capture_identity(candidate.absolute)
-            scope_device = os.stat(scope.absolute, follow_symlinks=False).st_dev
+            scope_device = file_reference(scope.absolute).volume
         except FileNotFoundError:
             return SafetyDecision(False, AuthorizationCode.NOT_FOUND, candidate)
         except OSError:
