@@ -10,6 +10,12 @@ on:
       - "scripts/build_exe.ps1"
       - "scripts/build_installer.ps1"
       - "packaging/windows/**"
+      - "scripts/gui_smoke.py"
+      - "scripts/release_gate.py"
+      - "PRIVACY.md"
+      - "SECURITY.md"
+      - "KNOWN_LIMITATIONS.md"
+      - "config.json"
       - ".github/workflows/build-windows-exe.yml"
 
 permissions:
