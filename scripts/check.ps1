@@ -5,3 +5,4 @@ python -m ruff format --check src/cdrive_cleaner scripts tests
 python -m mypy
 python -m pytest
 python scripts/check_mutation_gate.py
+python scripts/release_gate.py

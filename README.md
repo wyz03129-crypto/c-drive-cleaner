@@ -32,15 +32,15 @@ python -m pip install -e ".[gui]"
 c-drive-cleaner-gui
 ```
 
-本地构建单文件 EXE：
+本地构建单文件 EXE 和安装包（需要 Inno Setup 6）：
 
 ```powershell
 python -m pip install -e ".[dev,packaging]"
-.\scripts\build_exe.ps1
+.\scripts\build_installer.ps1
 ```
 
-输出为 `dist/CDriveCleaner.exe` 和 SHA-256 校验文件。GitHub Actions 的
-`Build Windows EXE` 工作流也会生成可下载的未签名构建产物。
+输出包括便携版 `CDriveCleaner.exe`、带卸载功能的安装包以及各自的 SHA-256 校验文件。
+GitHub Actions 的 `Build Windows EXE` 工作流也会生成可下载的未签名构建产物。
 
 ## 开发检查
 
@@ -55,6 +55,7 @@ ruff check .
 mypy
 pytest
 python scripts/check_mutation_gate.py
+python scripts/release_gate.py
 ```
 
 也可以运行：

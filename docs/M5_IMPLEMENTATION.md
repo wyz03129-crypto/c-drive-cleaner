@@ -13,6 +13,8 @@ M5 adds the consumer-facing PySide6 desktop application and a reproducible Windo
 - Aggregate cleanup history without file paths.
 - Privacy-safe diagnostic ZIP export.
 - PyInstaller one-file Windows build and SHA-256 checksum.
+- Per-user Inno Setup installer with Start Menu entry and uninstall support.
+- Offscreen GUI construction smoke test and 20-cycle confined cleanup stress test.
 - GitHub Actions build artifact for every relevant change on `main`.
 
 ## Safety boundaries

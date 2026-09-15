@@ -6,6 +6,7 @@ python -m PyInstaller `
   --onefile `
   --windowed `
   --name CDriveCleaner `
+  --version-file packaging/windows/version_info.txt `
   --paths src `
   src/cdrive_cleaner/gui_main.py
 
