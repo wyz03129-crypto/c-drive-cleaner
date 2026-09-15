@@ -16,7 +16,7 @@ from cdrive_cleaner.windows import KnownFolders
 def test_status_reports_m2(capsys: object) -> None:
     assert main(["status"]) == 0
     output = capsys.readouterr().out  # type: ignore[attr-defined]
-    assert "M2" in output
+    assert "M3" in output
     assert "已启用" in output
 
 
@@ -101,3 +101,23 @@ def test_recycle_bin_has_independent_query_and_confirmation(
     assert "2 项" in capsys.readouterr().out  # type: ignore[attr-defined]
     assert main(["recycle-bin", "--empty", "--confirm", "EMPTY RECYCLE BIN"]) == 0
     assert fake.emptied
+
+
+def test_analyze_and_cached_result_are_read_only(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: object
+) -> None:
+    class AnalysisFolders:
+        system_drive = tmp_path
+        local_app_data = tmp_path / "Local"
+
+    folders = AnalysisFolders()
+    data = tmp_path / "Users" / "Alice"
+    data.mkdir(parents=True)
+    target = data / "large.bin"
+    target.write_bytes(b"x" * 32)
+    monkeypatch.setattr("cdrive_cleaner.cli.discover_known_folders", lambda: folders)
+    assert main(["analyze", "--top", "2"]) == 0
+    assert "最大目录" in capsys.readouterr().out  # type: ignore[attr-defined]
+    assert target.exists()
+    assert main(["analyze", "--cached"]) == 0
+    assert "缓存快照时间" in capsys.readouterr().out  # type: ignore[attr-defined]

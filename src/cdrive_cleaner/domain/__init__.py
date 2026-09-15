@@ -12,16 +12,21 @@ from .models import (
     ScanError,
     ScanSnapshot,
 )
+from .storage import AnalysisCoverage, DirectoryUsage, LargeFile, StorageSnapshot
 
 __all__ = [
     "ActionKind",
     "ActionPlan",
+    "AnalysisCoverage",
     "CleanupReceipt",
+    "DirectoryUsage",
     "FileIdentity",
     "Finding",
+    "LargeFile",
     "PlannedAction",
     "ProductStage",
     "RiskLevel",
     "ScanError",
     "ScanSnapshot",
+    "StorageSnapshot",
 ]

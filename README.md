@@ -21,7 +21,7 @@ C Drive Cleaner 是一个面向普通 Windows 用户的 C 盘空间分析与安�
 | 自动测试与 Windows CI | 已完成 |
 | 安全内核 v2 | M1 已完成 |
 | 快速扫描与首批清理规则 | M2 CLI MVP |
-| 深度空间分析 | 尚未实现 |
+| 深度空间分析 | M3 CLI MVP |
 | 正式 GUI 和 EXE | 尚未实现 |
 
 ## 开发检查
@@ -51,6 +51,8 @@ python scripts/check_mutation_gate.py
 python -m cdrive_cleaner --version
 python -m cdrive_cleaner status
 python -m cdrive_cleaner scan
+python -m cdrive_cleaner analyze --top 20
+python -m cdrive_cleaner analyze --cached
 python -m cdrive_cleaner clean --rule user_temp
 python -m cdrive_cleaner clean --rule user_temp --execute --confirm CLEAN
 python -m cdrive_cleaner recycle-bin
@@ -69,6 +71,7 @@ python -m cdrive_cleaner recycle-bin --empty --confirm "EMPTY RECYCLE BIN"
 - `docs/LEGACY_MIGRATION.md`
 - `docs/M1_IMPLEMENTATION.md`
 - `docs/M2_IMPLEMENTATION.md`
+- `docs/M3_IMPLEMENTATION.md`
 
 ## 安全声明
 
