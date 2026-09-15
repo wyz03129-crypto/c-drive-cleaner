@@ -106,13 +106,19 @@ class SafetyPolicy:
         self._allow_roots = {path_key(normalize_path(root).canonical) for root in allow_roots}
         self._deny_roots = tuple(normalize_path(root) for root in deny_roots)
 
-    def _protected_name(self, path: Path) -> bool:
+    def _protected_name(self, path: Path, scope: Path) -> bool:
         parts = [part.casefold() for part in path.parts]
         if any(part in self._PROTECTED_PARTS or part.startswith("onedrive") for part in parts):
             return True
-        return path.name.casefold() in self._PROTECTED_NAMES or (
-            path.suffix.casefold() in self._PROTECTED_EXTENSIONS
+        if path.name.casefold() in self._PROTECTED_NAMES:
+            return True
+        # Windows thumbnail/icon databases are rebuildable shell caches. The
+        # exception is constrained to an allowlisted Explorer scope.
+        name = path.name.casefold()
+        shell_cache = scope.name.casefold() == "explorer" and (
+            name.startswith("thumbcache_") or name.startswith("iconcache_")
         )
+        return path.suffix.casefold() in self._PROTECTED_EXTENSIONS and not shell_cache
 
     def _denylisted(self, candidate: NormalizedPath) -> bool:
         return any(
@@ -122,6 +128,15 @@ class SafetyPolicy:
         )
 
     def _project_tree(self, target: Path, scope: Path) -> bool:
+        scope_key = (scope.parent.name.casefold(), scope.name.casefold())
+        package_cache_scopes = {
+            (".nuget", "packages"),
+            (".gradle", "caches"),
+            (".m2", "repository"),
+            ("pip", "cache"),
+        }
+        if scope.name.casefold() == "npm-cache" or scope_key in package_cache_scopes:
+            return False
         current = target.parent
         while same_or_within(current, scope):
             try:
@@ -159,7 +174,7 @@ class SafetyPolicy:
             return SafetyDecision(False, AuthorizationCode.OUTSIDE_SCOPE, candidate)
         if self._denylisted(candidate):
             return SafetyDecision(False, AuthorizationCode.DENYLISTED, candidate)
-        if self._protected_name(candidate.absolute):
+        if self._protected_name(candidate.absolute, scope.absolute):
             return SafetyDecision(False, AuthorizationCode.PROTECTED_NAME, candidate)
         if not os.path.lexists(candidate.absolute):
             return SafetyDecision(False, AuthorizationCode.NOT_FOUND, candidate)

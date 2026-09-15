@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 
 from cdrive_cleaner.domain import ActionKind, PlannedAction
 from cdrive_cleaner.safety import AuthorizationCode, SafetyPolicy, capture_identity
@@ -11,11 +12,16 @@ from .models import ExecutionResult, ExecutionStatus
 
 
 class DirectFileDeleteExecutor:
-    def __init__(self, policy: SafetyPolicy) -> None:
+    def __init__(
+        self, policy: SafetyPolicy, *, elevated_checker: Callable[[], bool] | None = None
+    ) -> None:
         self._policy = policy
+        self._elevated_checker = elevated_checker or (lambda: False)
 
     def execute(self, action: PlannedAction, *, dry_run: bool) -> ExecutionResult:
         finding = action.finding
+        if action.requires_elevation and not self._elevated_checker():
+            return ExecutionResult(ExecutionStatus.DENIED, error_code="elevation_required")
         if finding.action_kind is not ActionKind.DIRECT_FILE_DELETE:
             return ExecutionResult(
                 ExecutionStatus.DENIED,

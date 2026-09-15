@@ -159,3 +159,43 @@ def test_symlink_is_denied_and_external_target_survives(tmp_path: Path) -> None:
     )
     assert not decision.allowed
     assert outside.exists()
+
+
+def test_shell_cache_database_exception_is_narrow(tmp_path: Path) -> None:
+    scope = tmp_path / "Explorer"
+    scope.mkdir()
+    thumbnail = scope / "thumbcache_256.db"
+    unrelated = scope / "important.db"
+    thumbnail.write_bytes(b"cache")
+    unrelated.write_bytes(b"data")
+    policy = _policy(scope)
+    allowed = policy.authorize(
+        thumbnail,
+        scope_root=scope,
+        risk=RiskLevel.SAFE,
+        expected_identity=capture_identity(thumbnail),
+    )
+    denied = policy.authorize(
+        unrelated,
+        scope_root=scope,
+        risk=RiskLevel.SAFE,
+        expected_identity=capture_identity(unrelated),
+    )
+    assert allowed.allowed
+    assert denied.code is AuthorizationCode.PROTECTED_NAME
+
+
+def test_package_markers_inside_known_package_cache_are_not_projects(tmp_path: Path) -> None:
+    scope = tmp_path / ".nuget" / "packages"
+    package = scope / "demo"
+    package.mkdir(parents=True)
+    (package / "package.json").write_text("{}")
+    target = package / "artifact.bin"
+    target.write_bytes(b"cache")
+    decision = _policy(scope).authorize(
+        target,
+        scope_root=scope,
+        risk=RiskLevel.RECOMMENDED,
+        expected_identity=capture_identity(target),
+    )
+    assert decision.allowed

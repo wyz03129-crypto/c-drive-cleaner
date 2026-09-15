@@ -21,6 +21,7 @@ class RuleSpec:
     action_kind: ActionKind
     roots: tuple[Path, ...]
     requires_elevation: bool = False
+    include_patterns: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.rule_id or not self.rule_id.replace("_", "").isalnum():

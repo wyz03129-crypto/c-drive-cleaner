@@ -57,3 +57,18 @@ def test_changed_target_is_not_deleted(tmp_path: Path) -> None:
     result = DirectFileDeleteExecutor(SafetyPolicy([scope], [])).execute(action, dry_run=False)
     assert result.status is ExecutionStatus.DENIED
     assert target.exists()
+
+
+def test_elevated_action_requires_explicit_elevated_context(tmp_path: Path) -> None:
+    scope = tmp_path / "cache"
+    scope.mkdir()
+    target = scope / "admin.tmp"
+    target.write_text("x")
+    base = _action(target, scope)
+    action = PlannedAction(base.finding, requires_elevation=True)
+    denied = DirectFileDeleteExecutor(SafetyPolicy([scope], [])).execute(action, dry_run=False)
+    allowed = DirectFileDeleteExecutor(
+        SafetyPolicy([scope], []), elevated_checker=lambda: True
+    ).execute(action, dry_run=False)
+    assert denied.error_code == "elevation_required"
+    assert allowed.status is ExecutionStatus.DELETED

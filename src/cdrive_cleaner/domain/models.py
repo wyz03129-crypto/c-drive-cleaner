@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import IntEnum, StrEnum
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from cdrive_cleaner.executors.models import ExecutionResult
 
 
 class ProductStage(StrEnum):
@@ -64,6 +68,29 @@ class Finding:
 
 
 @dataclass(frozen=True)
+class ScanError:
+    """A redaction-friendly scan failure attached to a rule, not a raw path."""
+
+    rule_id: str
+    code: str
+
+
+@dataclass(frozen=True)
+class ScanSnapshot:
+    """Immutable quick-scan output, including partial-result diagnostics."""
+
+    started_at: datetime
+    finished_at: datetime
+    findings: tuple[Finding, ...]
+    errors: tuple[ScanError, ...]
+    cancelled: bool = False
+
+    @property
+    def estimated_bytes(self) -> int:
+        return sum(item.identity.size for item in self.findings)
+
+
+@dataclass(frozen=True)
 class PlannedAction:
     """An immutable action request that must still be reauthorized by an executor."""
 
@@ -93,3 +120,22 @@ class ActionPlan:
     @property
     def estimated_bytes(self) -> int:
         return sum(action.finding.identity.size for action in self.actions)
+
+
+@dataclass(frozen=True)
+class CleanupReceipt:
+    """Separates estimated work, processed bytes, and observed free-space change."""
+
+    plan_id: str
+    dry_run: bool
+    started_at: datetime
+    finished_at: datetime
+    estimated_bytes: int
+    processed_bytes: int
+    free_bytes_before: int
+    free_bytes_after: int
+    results: tuple[ExecutionResult, ...]
+
+    @property
+    def observed_freed_bytes(self) -> int:
+        return max(0, self.free_bytes_after - self.free_bytes_before)

@@ -19,8 +19,9 @@ C Drive Cleaner 是一个面向普通 Windows 用户的 C 盘空间分析与安�
 | v2 架构与安全模型 | 已建立 |
 | 正式包和 CLI 骨架 | 已完成 |
 | 自动测试与 Windows CI | 已完成 |
-| 安全内核 v2 | M1 |
-| 快速扫描和深度分析 | 尚未实现 |
+| 安全内核 v2 | M1 已完成 |
+| 快速扫描与首批清理规则 | M2 CLI MVP |
+| 深度空间分析 | 尚未实现 |
 | 正式 GUI 和 EXE | 尚未实现 |
 
 ## 开发检查
@@ -44,14 +45,21 @@ python scripts/check_mutation_gate.py
 .\scripts\check.ps1
 ```
 
-## 运行 M0 CLI
+## 运行 M2 CLI
 
 ```powershell
 python -m cdrive_cleaner --version
 python -m cdrive_cleaner status
+python -m cdrive_cleaner scan
+python -m cdrive_cleaner clean --rule user_temp
+python -m cdrive_cleaner clean --rule user_temp --execute --confirm CLEAN
+python -m cdrive_cleaner recycle-bin
+python -m cdrive_cleaner recycle-bin --empty --confirm "EMPTY RECYCLE BIN"
 ```
 
-M1 CLI 不扫描或删除任何文件，只报告当前工程阶段。
+`clean` 默认是 Dry Run。真实清理必须明确列出规则、增加 `--execute`，并精确输入
+`--confirm CLEAN`。需要管理员权限的规则在未提权时会被主动拒绝。回收站使用独立确认，
+不会混入普通缓存清理。
 
 ## 设计文档
 
@@ -59,7 +67,10 @@ M1 CLI 不扫描或删除任何文件，只报告当前工程阶段。
 - `docs/SAFETY_MODEL_V2.md`
 - `docs/ROADMAP_AND_ACCEPTANCE.md`
 - `docs/LEGACY_MIGRATION.md`
+- `docs/M1_IMPLEMENTATION.md`
+- `docs/M2_IMPLEMENTATION.md`
 
 ## 安全声明
 
-在 M2 快速清理规则和 Windows 实机测试完成以前，v2 不提供用户清理入口。M1 的真实删除能力只能由测试夹具直接调用。旧版入口仍位于 `src/main.py`，仅用于迁移对照，不属于新包的命令入口。
+M2 是供测试的 CLI MVP，并非正式发布版。请先运行 Dry Run 并核对规则。旧版入口仍位于
+`src/main.py`，仅用于迁移对照，不属于新包的命令入口。
