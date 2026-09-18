@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from contextlib import suppress
 
 from . import __version__
-from .analysis import FastScanner, StorageAnalyzer, WindowsAdvancedInspector
+from .analysis import FastScanner, StorageAnalyzer, WindowsAdvancedInspector, advise_path
 from .app import CleanupCoordinator, CleanupPlanner
 from .domain import AdvancedAction
 from .domain.errors import SafetyDeniedError, UnsupportedPlatformError
@@ -36,6 +36,12 @@ def build_parser() -> argparse.ArgumentParser:
     analyze = subcommands.add_parser("analyze", help="只读分析 C 盘空间占用")
     analyze.add_argument("--top", type=int, default=20, help="显示前 N 项（1-1000）")
     analyze.add_argument("--cached", action="store_true", help="立即显示上次结果，不重新扫描")
+    analyze.add_argument(
+        "--large-file-mb",
+        type=int,
+        default=500,
+        help="只列出不小于该阈值的大文件（默认 500 MB）",
+    )
     clean = subcommands.add_parser("clean", help="清理明确选择的规则")
     clean.add_argument("--rule", action="append", required=True, help="选择规则 ID，可重复")
     clean.add_argument("--execute", action="store_true", help="执行真实清理；省略时为 Dry Run")
@@ -125,7 +131,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             storage_snapshot = cache.load(expected_root=root) if args.cached else None
             if storage_snapshot is None:
-                storage_snapshot = StorageAnalyzer(top_n=args.top).analyze(root)
+                if args.large_file_mb < 0:
+                    parser.error("--large-file-mb 不能为负数")
+                storage_snapshot = StorageAnalyzer(
+                    top_n=args.top,
+                    large_file_threshold=args.large_file_mb * 1024**2,
+                ).analyze(root)
                 with suppress(OSError):
                     cache.save(storage_snapshot)
         except (UnsupportedPlatformError, OSError, ValueError) as error:
@@ -142,11 +153,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.cached:
             print(f"缓存快照时间：{storage_snapshot.finished_at.isoformat()}（仅供显示）")
         print("最大目录：")
+        profile = getattr(folders, "profile", root)
         for directory_item in storage_snapshot.top_directories:
-            print(f"{_format_bytes(directory_item.logical_bytes):>10}  {directory_item.path}")
+            advice = advise_path(directory_item.path, system_drive=root, profile=profile)
+            print(
+                f"{_format_bytes(directory_item.logical_bytes):>10}  {directory_item.path} "
+                f"[{advice.risk.name}: {advice.action}]"
+            )
         print("最大文件：")
         for file_item in storage_snapshot.top_files:
-            print(f"{_format_bytes(file_item.logical_bytes):>10}  {file_item.path}")
+            advice = advise_path(file_item.path, system_drive=root, profile=profile)
+            print(
+                f"{_format_bytes(file_item.logical_bytes):>10}  {file_item.path} "
+                f"[{advice.risk.name}: {advice.action}]"
+            )
         if (
             storage_snapshot.coverage.unreadable_directories
             or storage_snapshot.coverage.unreadable_entries

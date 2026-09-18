@@ -19,5 +19,6 @@ class ExecutionStatus(StrEnum):
 class ExecutionResult:
     status: ExecutionStatus
     bytes_processed: int = 0
+    bytes_attempted: int = 0
     authorization_code: AuthorizationCode | None = None
     error_code: str | None = None

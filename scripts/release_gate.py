@@ -23,7 +23,13 @@ def main() -> int:
     match = re.search(r'^version = "([^"]+)"$', project, re.MULTILINE)
     if match is None or match.group(1) != __version__:
         failures.append("package and runtime versions do not match")
-    for required in ("PRIVACY.md", "KNOWN_LIMITATIONS.md", "SECURITY.md"):
+    for required in (
+        "AGENTS.md",
+        "CHANGELOG.md",
+        "PRIVACY.md",
+        "KNOWN_LIMITATIONS.md",
+        "SECURITY.md",
+    ):
         if not (ROOT / required).is_file():
             failures.append(f"release document missing: {required}")
     if failures:

@@ -71,3 +71,18 @@ def test_cancelled_analysis_returns_partial_snapshot(tmp_path: Path) -> None:
 def test_top_n_is_bounded(top_n: int) -> None:
     with pytest.raises(ValueError):
         StorageAnalyzer(top_n=top_n)
+
+
+def test_large_file_threshold_filters_only_file_list(tmp_path: Path) -> None:
+    (tmp_path / "small.bin").write_bytes(b"x" * 4)
+    (tmp_path / "large.bin").write_bytes(b"x" * 12)
+
+    snapshot = StorageAnalyzer(large_file_threshold=10).analyze(tmp_path)
+
+    assert snapshot.total_logical_bytes == 16
+    assert [item.path.name for item in snapshot.top_files] == ["large.bin"]
+
+
+def test_large_file_threshold_rejects_negative_value() -> None:
+    with pytest.raises(ValueError):
+        StorageAnalyzer(large_file_threshold=-1)

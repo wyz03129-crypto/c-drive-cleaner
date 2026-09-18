@@ -20,6 +20,10 @@ class CleanupHistoryEntry:
     observed_freed_bytes: int
     succeeded: int
     skipped_or_failed: int
+    attempted_bytes: int = 0
+    skipped_bytes: int = 0
+    unattempted_bytes: int = 0
+    cancelled: bool = False
 
     @classmethod
     def from_receipt(cls, receipt: CleanupReceipt) -> CleanupHistoryEntry:
@@ -36,6 +40,10 @@ class CleanupHistoryEntry:
             receipt.observed_freed_bytes,
             succeeded,
             len(receipt.results) - succeeded,
+            receipt.attempted_bytes,
+            receipt.skipped_bytes,
+            receipt.unattempted_bytes,
+            receipt.cancelled,
         )
 
 

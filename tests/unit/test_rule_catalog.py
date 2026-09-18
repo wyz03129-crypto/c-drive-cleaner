@@ -19,7 +19,15 @@ def test_catalog_uses_known_folders_and_narrow_browser_roots(tmp_path: Path) -> 
     assert firefox not in firefox_rule.roots
     assert thumbnail_rule is not None
     assert thumbnail_rule.include_patterns == ("thumbcache_*.db", "iconcache_*.db")
-    assert len(registry.all()) == 17
+    assert len(registry.all()) == 20
+    baidu = registry.resolve("baidu_accelerate_cache", "1.0.0")
+    assert baidu is not None
+    assert not baidu.default_selected
+    assert baidu.confirmation_phrase == "清理百度缓存"
+    vscode = registry.resolve("vscode_cache", "1.0.0")
+    assert vscode is not None
+    assert not vscode.default_selected
+    assert all("User" not in root.name for root in vscode.roots)
 
 
 def test_catalog_discovers_all_ordinary_chromium_profiles(tmp_path: Path) -> None:

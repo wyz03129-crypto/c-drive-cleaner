@@ -17,7 +17,7 @@ def test_history_round_trip_uses_only_aggregate_values(tmp_path: Path) -> None:
         80,
         1_000,
         1_060,
-        (ExecutionResult(ExecutionStatus.DELETED, bytes_processed=80),),
+        (ExecutionResult(ExecutionStatus.DELETED, bytes_processed=80, bytes_attempted=80),),
     )
     path = tmp_path / "history.jsonl"
 
@@ -26,6 +26,7 @@ def test_history_round_trip_uses_only_aggregate_values(tmp_path: Path) -> None:
     entries = load_history(path)
     assert entries[0].observed_freed_bytes == 60
     assert entries[0].succeeded == 1
+    assert entries[0].attempted_bytes == 80
     assert "path" not in path.read_text(encoding="utf-8")
 
 

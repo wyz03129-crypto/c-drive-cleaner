@@ -31,6 +31,7 @@ def test_dry_run_uses_full_policy_but_does_not_delete(tmp_path: Path) -> None:
     )
     assert result.status is ExecutionStatus.SIMULATED
     assert result.bytes_processed == 4
+    assert result.bytes_attempted == 4
     assert target.exists()
 
 
@@ -56,6 +57,7 @@ def test_changed_target_is_not_deleted(tmp_path: Path) -> None:
     target.write_text("different content")
     result = DirectFileDeleteExecutor(SafetyPolicy([scope], [])).execute(action, dry_run=False)
     assert result.status is ExecutionStatus.DENIED
+    assert result.bytes_attempted == len("before")
     assert target.exists()
 
 
@@ -71,4 +73,5 @@ def test_elevated_action_requires_explicit_elevated_context(tmp_path: Path) -> N
         SafetyPolicy([scope], []), elevated_checker=lambda: True
     ).execute(action, dry_run=False)
     assert denied.error_code == "elevation_required"
+    assert denied.bytes_attempted == 1
     assert allowed.status is ExecutionStatus.DELETED

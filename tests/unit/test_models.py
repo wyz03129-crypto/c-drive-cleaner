@@ -18,11 +18,12 @@ from cdrive_cleaner.domain.errors import CleanerError, SafetyDeniedError, Unsupp
 def test_risk_levels_are_ordered_without_implying_permission() -> None:
     assert list(RiskLevel) == [
         RiskLevel.SAFE,
-        RiskLevel.RECOMMENDED,
-        RiskLevel.REVIEW,
-        RiskLevel.ADVANCED,
+        RiskLevel.CAUTION,
+        RiskLevel.MANUAL,
+        RiskLevel.SYSTEM,
         RiskLevel.PROTECTED,
     ]
+    assert RiskLevel.RECOMMENDED is RiskLevel.CAUTION
 
 
 def test_m0_and_closed_action_vocabulary() -> None:

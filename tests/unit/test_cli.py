@@ -21,7 +21,7 @@ def test_status_reports_m5(capsys: object) -> None:
 
 
 def test_package_version_matches_beta_line() -> None:
-    assert __version__ == "2.0.0b2"
+    assert __version__ == "2.0.0b3"
 
 
 def test_no_command_prints_help_without_filesystem_work(capsys: object) -> None:

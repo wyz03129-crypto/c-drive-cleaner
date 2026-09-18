@@ -46,3 +46,16 @@ def test_direct_delete_rejects_review_risk(tmp_path: Path) -> None:
 def test_rule_requires_absolute_roots() -> None:
     with pytest.raises(ValueError, match="absolute"):
         _rule(Path("relative"))
+
+
+def test_special_confirmation_requires_phrase(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="confirmation"):
+        RuleSpec(
+            "cache",
+            "1.0.0",
+            "Cache",
+            RiskLevel.CAUTION,
+            ActionKind.DIRECT_FILE_DELETE,
+            (tmp_path,),
+            requires_confirmation=True,
+        )

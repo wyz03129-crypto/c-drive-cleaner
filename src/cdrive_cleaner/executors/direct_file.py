@@ -20,11 +20,17 @@ class DirectFileDeleteExecutor:
 
     def execute(self, action: PlannedAction, *, dry_run: bool) -> ExecutionResult:
         finding = action.finding
+        attempted = finding.identity.size
         if action.requires_elevation and not self._elevated_checker():
-            return ExecutionResult(ExecutionStatus.DENIED, error_code="elevation_required")
+            return ExecutionResult(
+                ExecutionStatus.DENIED,
+                bytes_attempted=attempted,
+                error_code="elevation_required",
+            )
         if finding.action_kind is not ActionKind.DIRECT_FILE_DELETE:
             return ExecutionResult(
                 ExecutionStatus.DENIED,
+                bytes_attempted=attempted,
                 authorization_code=AuthorizationCode.RISK_NOT_DIRECT,
             )
         decision = self._policy.authorize(
@@ -36,6 +42,7 @@ class DirectFileDeleteExecutor:
         if not decision.allowed or decision.normalized is None:
             return ExecutionResult(
                 ExecutionStatus.DENIED,
+                bytes_attempted=attempted,
                 authorization_code=decision.code,
             )
         try:
@@ -43,15 +50,32 @@ class DirectFileDeleteExecutor:
             if final_identity != finding.identity:
                 return ExecutionResult(
                     ExecutionStatus.DENIED,
+                    bytes_attempted=attempted,
                     authorization_code=AuthorizationCode.IDENTITY_CHANGED,
                 )
             if dry_run:
-                return ExecutionResult(ExecutionStatus.SIMULATED, final_identity.size)
+                return ExecutionResult(
+                    ExecutionStatus.SIMULATED,
+                    final_identity.size,
+                    final_identity.size,
+                )
             os.remove(decision.normalized.absolute)
-            return ExecutionResult(ExecutionStatus.DELETED, final_identity.size)
+            return ExecutionResult(
+                ExecutionStatus.DELETED,
+                final_identity.size,
+                final_identity.size,
+            )
         except FileNotFoundError:
-            return ExecutionResult(ExecutionStatus.SKIPPED, error_code="not_found")
+            return ExecutionResult(
+                ExecutionStatus.SKIPPED, bytes_attempted=attempted, error_code="not_found"
+            )
         except PermissionError:
-            return ExecutionResult(ExecutionStatus.SKIPPED, error_code="permission_denied")
+            return ExecutionResult(
+                ExecutionStatus.SKIPPED,
+                bytes_attempted=attempted,
+                error_code="permission_denied",
+            )
         except OSError:
-            return ExecutionResult(ExecutionStatus.SKIPPED, error_code="os_error")
+            return ExecutionResult(
+                ExecutionStatus.SKIPPED, bytes_attempted=attempted, error_code="os_error"
+            )

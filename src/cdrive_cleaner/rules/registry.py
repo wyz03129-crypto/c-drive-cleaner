@@ -22,6 +22,13 @@ class RuleSpec:
     roots: tuple[Path, ...]
     requires_elevation: bool = False
     include_patterns: tuple[str, ...] = ()
+    category: str = "application_cache"
+    description: str = "可由系统或应用重新生成的数据"
+    scan_strategy: str = "recursive_files"
+    recommended_action: str = "关闭相关应用后清理"
+    requires_confirmation: bool = False
+    confirmation_phrase: str = ""
+    default_selected: bool = True
 
     def __post_init__(self) -> None:
         if not self.rule_id or not self.rule_id.replace("_", "").isalnum():
@@ -34,9 +41,13 @@ class RuleSpec:
             raise ValueError("rule roots must be absolute")
         if self.action_kind is ActionKind.DIRECT_FILE_DELETE and self.risk not in {
             RiskLevel.SAFE,
-            RiskLevel.RECOMMENDED,
+            RiskLevel.CAUTION,
         }:
             raise ValueError("direct deletion is limited to SAFE or RECOMMENDED rules")
+        if self.requires_confirmation and not self.confirmation_phrase:
+            raise ValueError("confirmation rules require a non-empty phrase")
+        if self.risk >= RiskLevel.MANUAL and self.default_selected:
+            raise ValueError("MANUAL, SYSTEM, and PROTECTED rules cannot be selected by default")
 
 
 class RuleRegistry:

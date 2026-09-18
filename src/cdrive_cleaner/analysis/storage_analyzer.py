@@ -26,10 +26,13 @@ class _Usage:
 class StorageAnalyzer:
     """Analyze one volume without following links or granting cleanup permission."""
 
-    def __init__(self, *, top_n: int = 20) -> None:
+    def __init__(self, *, top_n: int = 20, large_file_threshold: int = 0) -> None:
         if not 1 <= top_n <= 1000:
             raise ValueError("top_n must be between 1 and 1000")
+        if large_file_threshold < 0:
+            raise ValueError("large_file_threshold cannot be negative")
         self._top_n = top_n
+        self._large_file_threshold = large_file_threshold
 
     def analyze(self, root: Path, *, token: CancellationToken | None = None) -> StorageSnapshot:
         started = datetime.now(UTC)
@@ -73,12 +76,13 @@ class StorageAnalyzer:
                             total_bytes += info.st_size
                             total_files += 1
                             self._add_file(usage, path.parent, root, info.st_size)
-                            sequence += 1
-                            item = (info.st_size, sequence, path, info.st_mtime_ns)
-                            if len(largest) < self._top_n:
-                                heapq.heappush(largest, item)
-                            elif item[:2] > largest[0][:2]:
-                                heapq.heapreplace(largest, item)
+                            if info.st_size >= self._large_file_threshold:
+                                sequence += 1
+                                item = (info.st_size, sequence, path, info.st_mtime_ns)
+                                if len(largest) < self._top_n:
+                                    heapq.heappush(largest, item)
+                                elif item[:2] > largest[0][:2]:
+                                    heapq.heapreplace(largest, item)
                         except OSError:
                             unreadable_entries += 1
             except OSError:

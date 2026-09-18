@@ -24,13 +24,22 @@ class ProductStage(StrEnum):
 
 
 class RiskLevel(IntEnum):
-    """Ordered risk levels; a larger number never implies authorization."""
+    """Ordered policy levels; a larger number never implies authorization.
+
+    The first four names are the user-facing safety model.  ``PROTECTED`` is
+    an internal deny class rather than a cleanup choice.  The old names remain
+    aliases so stored plans and third-party callers do not break during beta.
+    """
 
     SAFE = 1
-    RECOMMENDED = 2
-    REVIEW = 3
-    ADVANCED = 4
+    CAUTION = 2
+    MANUAL = 3
+    SYSTEM = 4
     PROTECTED = 5
+
+    RECOMMENDED = CAUTION
+    REVIEW = MANUAL
+    ADVANCED = SYSTEM
 
 
 class ActionKind(StrEnum):
@@ -135,7 +144,28 @@ class CleanupReceipt:
     free_bytes_before: int
     free_bytes_after: int
     results: tuple[ExecutionResult, ...]
+    cancelled: bool = False
 
     @property
     def observed_freed_bytes(self) -> int:
         return max(0, self.free_bytes_after - self.free_bytes_before)
+
+    @property
+    def attempted_bytes(self) -> int:
+        return sum(item.bytes_attempted for item in self.results)
+
+    @property
+    def skipped_bytes(self) -> int:
+        return sum(
+            item.bytes_attempted
+            for item in self.results
+            if item.status.value in {"skipped", "denied"}
+        )
+
+    @property
+    def failed_count(self) -> int:
+        return sum(item.status.value in {"skipped", "denied"} for item in self.results)
+
+    @property
+    def unattempted_bytes(self) -> int:
+        return max(0, self.estimated_bytes - self.attempted_bytes)
