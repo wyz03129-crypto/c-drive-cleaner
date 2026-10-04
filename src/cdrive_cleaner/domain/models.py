@@ -105,6 +105,9 @@ class PlannedAction:
 
     finding: Finding
     requires_elevation: bool = False
+    include_patterns: tuple[str, ...] = ()
+    min_age_days: int = 0
+    blocking_processes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

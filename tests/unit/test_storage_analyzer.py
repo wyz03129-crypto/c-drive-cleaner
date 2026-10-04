@@ -86,3 +86,35 @@ def test_large_file_threshold_filters_only_file_list(tmp_path: Path) -> None:
 def test_large_file_threshold_rejects_negative_value() -> None:
     with pytest.raises(ValueError):
         StorageAnalyzer(large_file_threshold=-1)
+
+
+def test_progress_and_nested_aggregation(tmp_path: Path) -> None:
+    child = tmp_path / "a/b/c"
+    child.mkdir(parents=True)
+    for index in range(260):
+        (child / f"{index}.bin").write_bytes(b"ab")
+    updates: list[tuple[int, int]] = []
+    snapshot = StorageAnalyzer().analyze(
+        tmp_path, progress=lambda count, size: updates.append((count, size))
+    )
+    assert updates == [(256, 512)]
+    assert snapshot.total_files == 260
+    top = next(item for item in snapshot.directories if item.path == tmp_path / "a")
+    assert (top.logical_bytes, top.file_count, top.directory_count) == (520, 260, 2)
+
+
+def test_unreadable_directory_is_reported(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from cdrive_cleaner.analysis import storage_analyzer
+
+    (tmp_path / "locked").mkdir()
+    real_scandir = os.scandir
+
+    def controlled_scandir(path: Path):
+        if Path(path).name == "locked":
+            raise PermissionError("fixture denied")
+        return real_scandir(path)
+
+    monkeypatch.setattr(storage_analyzer.os, "scandir", controlled_scandir)
+    snapshot = StorageAnalyzer().analyze(tmp_path)
+    assert snapshot.coverage.unreadable_directories == 1
+    assert snapshot.unreadable_paths == (tmp_path / "locked",)

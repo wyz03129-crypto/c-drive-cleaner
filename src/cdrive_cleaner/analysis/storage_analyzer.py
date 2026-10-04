@@ -1,4 +1,4 @@
-"""Read-only, bounded-memory directory and large-file analysis."""
+"""Read-only directory analysis with a bounded large-file result list."""
 
 from __future__ import annotations
 
@@ -6,11 +6,13 @@ import heapq
 import os
 import stat
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from cdrive_cleaner.domain import AnalysisCoverage, DirectoryUsage, LargeFile, StorageSnapshot
+from cdrive_cleaner.safety.reparse import chain_contains_reparse
 from cdrive_cleaner.windows.file_identity import file_reference
 
 from .fast_scan import CancellationToken
@@ -34,9 +36,18 @@ class StorageAnalyzer:
         self._top_n = top_n
         self._large_file_threshold = large_file_threshold
 
-    def analyze(self, root: Path, *, token: CancellationToken | None = None) -> StorageSnapshot:
+    def analyze(
+        self,
+        root: Path,
+        *,
+        token: CancellationToken | None = None,
+        progress: Callable[[int, int], None] | None = None,
+    ) -> StorageSnapshot:
         started = datetime.now(UTC)
         cancellation = token or CancellationToken()
+        root = root.absolute()
+        if chain_contains_reparse(root, Path(root.anchor)):
+            raise ValueError("分析根目录包含链接、重解析点或不可读路径")
         root = root.resolve(strict=True)
         usage: dict[Path, _Usage] = defaultdict(_Usage)
         pending = [root]
@@ -44,10 +55,14 @@ class StorageAnalyzer:
         largest: list[tuple[int, int, Path, int]] = []
         scanned_dirs = unreadable_dirs = unreadable_entries = skipped_reparse = 0
         duplicate_bytes = total_bytes = total_files = sequence = 0
+        unreadable_paths: list[Path] = []
 
         while pending and not cancellation.cancelled:
             directory = pending.pop()
             try:
+                if chain_contains_reparse(directory, root):
+                    skipped_reparse += 1
+                    continue
                 with os.scandir(directory) as entries:
                     scanned_dirs += 1
                     for entry in entries:
@@ -62,7 +77,8 @@ class StorageAnalyzer:
                                 continue
                             if stat.S_ISDIR(info.st_mode):
                                 pending.append(path)
-                                self._add_directory(usage, path, root)
+                                usage[path]
+                                usage[directory].directory_count += 1
                                 continue
                             if not stat.S_ISREG(info.st_mode):
                                 continue
@@ -75,7 +91,10 @@ class StorageAnalyzer:
                                 seen_files.add(identity)
                             total_bytes += info.st_size
                             total_files += 1
-                            self._add_file(usage, path.parent, root, info.st_size)
+                            usage[directory].logical_bytes += info.st_size
+                            usage[directory].file_count += 1
+                            if progress is not None and total_files % 256 == 0:
+                                progress(total_files, total_bytes)
                             if info.st_size >= self._large_file_threshold:
                                 sequence += 1
                                 item = (info.st_size, sequence, path, info.st_mtime_ns)
@@ -85,8 +104,22 @@ class StorageAnalyzer:
                                     heapq.heapreplace(largest, item)
                         except OSError:
                             unreadable_entries += 1
+                            if len(unreadable_paths) < 1000:
+                                unreadable_paths.append(path)
             except OSError:
                 unreadable_dirs += 1
+                if len(unreadable_paths) < 1000:
+                    unreadable_paths.append(directory)
+
+        # Aggregate each directory once instead of walking all ancestors for every file.
+        for path in sorted(usage, key=lambda p: len(p.parts), reverse=True):
+            if path == root:
+                continue
+            child = usage[path]
+            parent = usage[path.parent]
+            parent.logical_bytes += child.logical_bytes
+            parent.file_count += child.file_count
+            parent.directory_count += child.directory_count
 
         directories = tuple(
             sorted(
@@ -119,27 +152,5 @@ class StorageAnalyzer:
                 duplicate_bytes,
             ),
             cancellation.cancelled,
+            tuple(unreadable_paths),
         )
-
-    @staticmethod
-    def _ancestors(directory: Path, root: Path) -> list[Path]:
-        values: list[Path] = []
-        current = directory
-        while current == root or root in current.parents:
-            values.append(current)
-            if current == root:
-                break
-            current = current.parent
-        return values
-
-    @classmethod
-    def _add_file(cls, usage: dict[Path, _Usage], directory: Path, root: Path, size: int) -> None:
-        for ancestor in cls._ancestors(directory, root):
-            usage[ancestor].logical_bytes += size
-            usage[ancestor].file_count += 1
-
-    @classmethod
-    def _add_directory(cls, usage: dict[Path, _Usage], directory: Path, root: Path) -> None:
-        usage[directory]
-        for ancestor in cls._ancestors(directory.parent, root):
-            usage[ancestor].directory_count += 1

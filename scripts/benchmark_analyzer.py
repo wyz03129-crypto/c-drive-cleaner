@@ -26,7 +26,9 @@ def main() -> int:
     args = parser.parse_args()
     if args.files < 1:
         parser.error("--files must be positive")
-    with tempfile.TemporaryDirectory(prefix="cdrive-m3-benchmark-") as temporary:
+    confined = Path(__file__).resolve().parents[1] / "tests/.tmp"
+    confined.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="cdrive-m3-benchmark-", dir=confined) as temporary:
         root = Path(temporary)
         fixture_started = time.perf_counter()
         build_fixture(root, args.files)

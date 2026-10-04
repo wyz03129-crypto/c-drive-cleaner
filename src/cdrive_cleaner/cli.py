@@ -10,6 +10,7 @@ from contextlib import suppress
 from . import __version__
 from .analysis import FastScanner, StorageAnalyzer, WindowsAdvancedInspector, advise_path
 from .app import CleanupCoordinator, CleanupPlanner
+from .app.result_summary import failure_summary
 from .domain import AdvancedAction
 from .domain.errors import SafetyDeniedError, UnsupportedPlatformError
 from .executors import DirectFileDeleteExecutor, RecycleBinExecutor, WindowsAdvancedExecutor
@@ -46,6 +47,9 @@ def build_parser() -> argparse.ArgumentParser:
     clean.add_argument("--rule", action="append", required=True, help="选择规则 ID，可重复")
     clean.add_argument("--execute", action="store_true", help="执行真实清理；省略时为 Dry Run")
     clean.add_argument("--confirm", help="真实清理必须精确输入 CLEAN")
+    clean.add_argument(
+        "--confirm-rule", action="append", default=[], help="专项确认，格式 rule_id=确认词，可重复"
+    )
     recycle = subcommands.add_parser("recycle-bin", help="独立查询或清空 C 盘回收站")
     recycle.add_argument("--empty", action="store_true", help="清空回收站；省略时只查询")
     recycle.add_argument("--confirm", help="清空时必须精确输入 EMPTY RECYCLE BIN")
@@ -200,11 +204,24 @@ def main(argv: Sequence[str] | None = None) -> int:
             parser.error(f"未知规则: {', '.join(sorted(unknown))}")
         if args.execute and args.confirm != "CLEAN":
             parser.error("真实清理需要 --confirm CLEAN")
+        if args.execute:
+            confirmations = dict(value.split("=", 1) for value in args.confirm_rule if "=" in value)
+            for rule in registry.all():
+                if (
+                    rule.rule_id in selected
+                    and rule.requires_confirmation
+                    and (confirmations.get(rule.rule_id) != rule.confirmation_phrase)
+                ):
+                    parser.error(
+                        f"需要专项确认 --confirm-rule '{rule.rule_id}={rule.confirmation_phrase}'"
+                    )
         plan = CleanupPlanner(registry).build(
             finding for finding in quick_snapshot.findings if finding.rule_id in selected
         )
         receipt = CleanupCoordinator(
-            DirectFileDeleteExecutor(policy, elevated_checker=is_process_elevated),
+            DirectFileDeleteExecutor(
+                policy, elevated_checker=is_process_elevated, registry=registry
+            ),
             free_space_reader=free_bytes,
         ).execute(plan, volume=folders.system_drive, dry_run=not args.execute)
         mode = "Dry Run" if receipt.dry_run else "真实清理"
@@ -212,6 +229,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         processed = _format_bytes(receipt.processed_bytes)
         print(f"{mode}：预计 {estimate}，处理 {processed}")
         print(f"观测可用空间增加：{_format_bytes(receipt.observed_freed_bytes)}")
+        if receipt.failed_count:
+            print(failure_summary(receipt))
         return 0
     parser.print_help()
     return 0

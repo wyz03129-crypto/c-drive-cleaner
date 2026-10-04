@@ -9,13 +9,13 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from fnmatch import fnmatch
 from pathlib import Path
 
 from cdrive_cleaner.domain import Finding, ScanError, ScanSnapshot
 from cdrive_cleaner.rules import RuleRegistry, RuleSpec
+from cdrive_cleaner.rules.predicates import matches_file
 from cdrive_cleaner.safety import capture_identity
-from cdrive_cleaner.safety.reparse import is_reparse_point
+from cdrive_cleaner.safety.reparse import chain_contains_reparse, is_reparse_point
 
 ProgressCallback = Callable[[str, int], None]
 
@@ -85,7 +85,7 @@ class FastScanner:
     ) -> tuple[list[Finding], list[ScanError]]:
         findings: list[Finding] = []
         errors: list[ScanError] = []
-        if not root.exists() or is_reparse_point(root):
+        if not root.exists() or chain_contains_reparse(root, Path(root.anchor)):
             return findings, errors
         pending = [root]
         visited = 0
@@ -104,9 +104,9 @@ class FastScanner:
                             if stat.S_ISDIR(info.st_mode):
                                 pending.append(path)
                             elif stat.S_ISREG(info.st_mode):
-                                if rule.include_patterns and not any(
-                                    fnmatch(entry.name.casefold(), pattern.casefold())
-                                    for pattern in rule.include_patterns
+                                identity = capture_identity(path)
+                                if not matches_file(
+                                    path, identity, rule.include_patterns, rule.min_age_days
                                 ):
                                     continue
                                 findings.append(
@@ -117,7 +117,7 @@ class FastScanner:
                                         root,
                                         rule.risk,
                                         rule.action_kind,
-                                        capture_identity(path),
+                                        identity,
                                     )
                                 )
                                 visited += 1

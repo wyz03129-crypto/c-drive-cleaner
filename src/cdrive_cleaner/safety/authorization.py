@@ -179,7 +179,7 @@ class SafetyPolicy:
             return SafetyDecision(False, AuthorizationCode.PROTECTED_NAME, candidate)
         if not os.path.lexists(candidate.absolute):
             return SafetyDecision(False, AuthorizationCode.NOT_FOUND, candidate)
-        if chain_contains_reparse(candidate.absolute, scope.absolute):
+        if chain_contains_reparse(candidate.absolute, Path(candidate.absolute.anchor)):
             return SafetyDecision(False, AuthorizationCode.REPARSE_POINT, candidate)
         if self._project_tree(candidate.absolute, scope.absolute):
             return SafetyDecision(False, AuthorizationCode.PROJECT_TREE, candidate)

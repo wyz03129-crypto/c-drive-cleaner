@@ -34,6 +34,17 @@ class Violation:
 
 def _call_name(node: ast.Call) -> str | None:
     value = node.func
+    if isinstance(value, ast.Attribute) and value.attr in {
+        "unlink",
+        "rmdir",
+        "rmtree",
+        "remove",
+        "removedirs",
+        "DeleteFileW",
+        "DeleteFileA",
+        "SetFileInformationByHandle",
+    }:
+        return "os.remove"  # Conservative detection includes aliases and Path instances.
     if isinstance(value, ast.Attribute) and isinstance(value.value, ast.Name):
         return f"{value.value.id}.{value.attr}"
     return None
@@ -52,10 +63,19 @@ def find_violations(source_root: Path = SOURCE_ROOT) -> list[Violation]:
         if _approved(relative):
             continue
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        imported_deletes = {
+            alias.asname or alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module in {"os", "shutil"}
+            for alias in node.names
+            if alias.name in {"remove", "unlink", "rmdir", "rmtree", "removedirs"}
+        }
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
             name = _call_name(node)
+            if isinstance(node.func, ast.Name) and node.func.id in imported_deletes:
+                name = "os.remove"
             if name in MUTATING_CALLS:
                 violations.append(Violation(relative, node.lineno, name))
     return violations

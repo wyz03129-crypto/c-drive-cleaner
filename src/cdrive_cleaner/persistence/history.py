@@ -6,6 +6,7 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from cdrive_cleaner.app.result_summary import failure_summary
 from cdrive_cleaner.domain import CleanupReceipt
 from cdrive_cleaner.executors.models import ExecutionStatus
 
@@ -24,6 +25,7 @@ class CleanupHistoryEntry:
     skipped_bytes: int = 0
     unattempted_bytes: int = 0
     cancelled: bool = False
+    failure_details: str = ""
 
     @classmethod
     def from_receipt(cls, receipt: CleanupReceipt) -> CleanupHistoryEntry:
@@ -44,6 +46,7 @@ class CleanupHistoryEntry:
             receipt.skipped_bytes,
             receipt.unattempted_bytes,
             receipt.cancelled,
+            failure_summary(receipt),
         )
 
 

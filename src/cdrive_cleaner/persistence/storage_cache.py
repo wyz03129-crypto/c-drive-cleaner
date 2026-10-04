@@ -47,6 +47,7 @@ class StorageSnapshotCache:
                 snapshot.coverage.duplicate_hardlink_bytes,
             ],
             "cancelled": snapshot.cancelled,
+            "unreadable_paths": [str(path) for path in snapshot.unreadable_paths],
         }
         self._path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self._path.with_suffix(".tmp")
@@ -85,6 +86,7 @@ class StorageSnapshotCache:
                 files,
                 coverage,
                 bool(payload["cancelled"]),
+                tuple(Path(path) for path in payload.get("unreadable_paths", ())),
             )
         except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
             return None

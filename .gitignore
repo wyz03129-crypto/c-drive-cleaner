@@ -6,8 +6,10 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .venv/
+.venv-qa/
 venv/
 build/
 dist/
 *.spec
 *.log
+tests/.tmp/
