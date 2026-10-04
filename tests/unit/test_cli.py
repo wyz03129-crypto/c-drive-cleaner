@@ -21,7 +21,7 @@ def test_status_reports_m5(capsys: object) -> None:
 
 
 def test_package_version_matches_beta_line() -> None:
-    assert __version__ == "2.0.0b3"
+    assert __version__ == "2.2.0b1"
 
 
 def test_no_command_prints_help_without_filesystem_work(capsys: object) -> None:
@@ -77,6 +77,25 @@ def test_unknown_rule_is_rejected(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     monkeypatch.setattr("cdrive_cleaner.cli._runtime", lambda: runtime)
     with pytest.raises(SystemExit):
         main(["clean", "--rule", "made_up"])
+
+
+def test_cli_cannot_bypass_dedicated_confirmation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from dataclasses import replace
+
+    folders, registry, policy = fake_runtime(tmp_path)
+    rule = replace(registry.all()[0], requires_confirmation=True, confirmation_phrase="CONFIRM APP")
+    target = rule.roots[0] / "item.tmp"
+    target.write_bytes(b"keep until confirmed")
+    registry = RuleRegistry([rule])
+    monkeypatch.setattr("cdrive_cleaner.cli._runtime", lambda: (folders, registry, policy))
+    args = ["clean", "--rule", "test_cache", "--execute", "--confirm", "CLEAN"]
+    with pytest.raises(SystemExit):
+        main(args)
+    assert target.exists()
+    assert main([*args, "--confirm-rule", "test_cache=CONFIRM APP"]) == 0
+    assert not target.exists()
 
 
 def test_recycle_bin_has_independent_query_and_confirmation(

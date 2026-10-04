@@ -7,6 +7,7 @@ from collections.abc import Iterable
 
 from cdrive_cleaner.domain import ActionKind, ActionPlan, Finding, PlannedAction
 from cdrive_cleaner.rules import RuleRegistry
+from cdrive_cleaner.rules.predicates import matches_file
 from cdrive_cleaner.safety.authorization import SafetyPolicy
 
 
@@ -27,7 +28,19 @@ class CleanupPlanner:
             ):
                 continue
             if finding.action_kind is ActionKind.DIRECT_FILE_DELETE:
-                actions.append(PlannedAction(finding, rule.requires_elevation))
+                if not matches_file(
+                    finding.path, finding.identity, rule.include_patterns, rule.min_age_days
+                ):
+                    continue
+                actions.append(
+                    PlannedAction(
+                        finding,
+                        rule.requires_elevation,
+                        rule.include_patterns,
+                        rule.min_age_days,
+                        rule.blocking_processes,
+                    )
+                )
         return ActionPlan.create(
             plan_id=uuid.uuid4().hex,
             policy_version=SafetyPolicy.POLICY_VERSION,

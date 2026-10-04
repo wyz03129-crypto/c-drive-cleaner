@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import ctypes
 import os
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
+from pathlib import Path
 from typing import ClassVar
 
 from cdrive_cleaner.domain import AdvancedAction, CommandResult
@@ -15,8 +17,20 @@ CommandRunner = Callable[[Sequence[str], int], subprocess.CompletedProcess[str]]
 
 
 def _run(argv: Sequence[str], timeout: int) -> subprocess.CompletedProcess[str]:
+    # Elevated operations must never resolve executables from the working directory or PATH.
+    api = ctypes.WinDLL("kernel32", use_last_error=True)
+    api.GetSystemDirectoryW.argtypes = [ctypes.c_wchar_p, ctypes.c_uint]
+    api.GetSystemDirectoryW.restype = ctypes.c_uint
+    buffer = ctypes.create_unicode_buffer(32768)
+    length = api.GetSystemDirectoryW(buffer, len(buffer))
+    if not 0 < length < len(buffer):
+        raise OSError("cannot discover trusted Windows system directory")
+    system = Path(buffer.value)
+    command = [str(system / argv[0]), *argv[1:]]
+    if argv[0] == "vssadmin.exe":
+        command[-1] = f"/for={system.drive}"
     return subprocess.run(
-        list(argv),
+        command,
         shell=False,
         capture_output=True,
         text=True,

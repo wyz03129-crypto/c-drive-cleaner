@@ -179,7 +179,7 @@ class SafetyPolicy:
             return SafetyDecision(False, AuthorizationCode.PROTECTED_NAME, candidate)
         if not os.path.lexists(candidate.absolute):
             return SafetyDecision(False, AuthorizationCode.NOT_FOUND, candidate)
-        if chain_contains_reparse(candidate.absolute, scope.absolute):
+        if chain_contains_reparse(candidate.absolute, Path(candidate.absolute.anchor)):
             return SafetyDecision(False, AuthorizationCode.REPARSE_POINT, candidate)
         if self._project_tree(candidate.absolute, scope.absolute):
             return SafetyDecision(False, AuthorizationCode.PROJECT_TREE, candidate)
@@ -197,3 +197,18 @@ class SafetyPolicy:
         if current != expected_identity:
             return SafetyDecision(False, AuthorizationCode.IDENTITY_CHANGED, candidate)
         return SafetyDecision(True, AuthorizationCode.ALLOWED, candidate)
+
+    def authorize_restore(self, path: Path, *, scope_root: Path) -> None:
+        """Validate a missing restoration destination without authorizing deletion."""
+        candidate, scope = normalize_path(path), normalize_path(scope_root)
+        if (
+            path_key(scope.canonical) not in self._allow_roots
+            or not strictly_within(candidate.absolute, scope.absolute)
+            or not strictly_within(candidate.canonical, scope.canonical)
+            or self._denylisted(candidate)
+            or self._protected_name(candidate.absolute, scope.absolute)
+            or os.path.lexists(candidate.absolute)
+            or chain_contains_reparse(candidate.absolute.parent, Path(candidate.absolute.anchor))
+            or self._project_tree(candidate.absolute, scope.absolute)
+        ):
+            raise OSError("恢复目标已存在、受保护、父目录丢失或路径不安全；不覆盖")

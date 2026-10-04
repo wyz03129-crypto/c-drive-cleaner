@@ -2,6 +2,7 @@ name: Build Windows EXE
 
 on:
   workflow_dispatch:
+  pull_request:
   push:
     branches: [main]
     paths:
@@ -51,6 +52,12 @@ jobs:
       - name: Test silent install and uninstall
         shell: pwsh
         run: .\scripts\test_installer.ps1
+      - name: Smoke test frozen portable executable
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath .\dist\CDriveCleaner.exe -ArgumentList "--smoke-test" -WindowStyle Hidden -PassThru
+          if (-not $process.WaitForExit(60000)) { throw "Frozen GUI did not exit in 60 seconds" }
+          if ($process.ExitCode -ne 0) { throw "Frozen GUI failed with exit code $($process.ExitCode)" }
       - uses: actions/upload-artifact@v4
         with:
           name: CDriveCleaner-windows-unsigned

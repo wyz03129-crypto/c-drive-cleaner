@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "c-drive-cleaner"
-version = "2.0.0b3"
+version = "2.2.0b1"
 description = "Safety-first Windows C drive analyzer and cleanup planner"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -29,8 +29,8 @@ dev = [
   "pytest-cov>=6.0",
   "ruff>=0.8",
 ]
-gui = ["PySide6>=6.8,<7"]
-packaging = ["PyInstaller>=6.11,<7", "PySide6>=6.8,<7"]
+gui = ["PySide6-Essentials>=6.8,<7"]
+packaging = ["PyInstaller>=6.11,<7", "PySide6-Essentials>=6.8,<7"]
 
 [project.scripts]
 c-drive-cleaner = "cdrive_cleaner.cli:main"
@@ -47,7 +47,7 @@ include = ["cdrive_cleaner*"]
 cdrive_cleaner = ["py.typed"]
 
 [tool.pytest.ini_options]
-addopts = "--strict-config --strict-markers --cov=cdrive_cleaner --cov-report=term-missing"
+addopts = "--strict-config --strict-markers --basetemp=tests/.tmp/pytest --cov=cdrive_cleaner --cov-report=term-missing"
 testpaths = ["tests"]
 
 [tool.coverage.run]

@@ -2,10 +2,20 @@
 
 C Drive Cleaner 是一个面向普通 Windows 用户的 C 盘空间分析与安全清理项目。
 
-当前开发版本是 **2.0.0 beta 3（未签名）**。v1.1 迁移已经完成，仓库只保留 v2
+当前开发版本是 **2.2.0 beta 1（可恢复清理测试版，未签名）**。v1.1 迁移已经完成，仓库只保留 v2
 生产源码；正式稳定版仍需代码签名以及更多 Windows 10/11 真实机器验收。
 
 ## 项目目标
+
+2.1 优先面向个人和朋友离线使用：目录树逐层展开、大文件路径/扩展名/风险筛选、
+重复文件完整内容比对、应用运行检测、句柄级文件删除和清理失败解释。
+无需会员。2.2 默认选择“备份后清理”：需手动选择另一磁盘卷的私人隔离目录，
+校验备份后才删除原文件；可在“隔离与恢复”页恢复，且不覆盖已有文件。
+另保留永久清理模式，其删除不可撤销。需要管理员的类别暂不支持可恢复模式。
+
+个人版使用说明：`docs/PERSONAL_QUICKSTART.md`。
+本次实机证据和未验证范围：`docs/PERSONAL_2_2_ACCEPTANCE.md`。
+2.1 历史验收记录保留在 `docs/PERSONAL_2_1_ACCEPTANCE.md`。
 
 - 快速解释 C 盘空间被哪些目录、文件和应用占用；
 - 区分 SAFE、CAUTION、MANUAL、SYSTEM 和内部 PROTECTED 禁止区；
@@ -21,10 +31,11 @@ C Drive Cleaner 是一个面向普通 Windows 用户的 C 盘空间分析与安�
 | 正式包和 CLI 骨架 | 已完成 |
 | 自动测试与 Windows CI | 已完成 |
 | 安全内核 v2 | M1 已完成 |
-| 快速扫描与 20 项代码审计规则 | Beta 3 |
-| 深度空间分析与大文件建议 | Beta 3 |
-| Windows 高级空间优化 | Beta 3 |
-| 正式 GUI、EXE 和安装包 | 未签名 Beta 3 |
+| 快速扫描与 21 项规则（19 项可清理、2 项仅分析） | 2.1 Beta |
+| 目录树、大文件筛选、重复文件分析 | 2.1 Beta |
+| Windows 高级空间优化 | DISM / 休眠 / 回收站独立确认 |
+| GUI、EXE 和安装包 | 未签名测试版 |
+| 跨卷备份后清理、恢复与备份清除 | 2.2 Beta；详细限制见使用说明 |
 
 ## 安全模型
 
@@ -43,16 +54,26 @@ C Drive Cleaner 是一个面向普通 Windows 用户的 C 盘空间分析与安�
 
 - 用户和 Windows 临时文件、缩略图、DirectX 着色器、崩溃转储、WER 归档；
 - Chrome、Edge、Firefox 的明确缓存子目录；
-- pip、npm、NuGet、Gradle、Maven 可重建缓存；
-- Office、WPS、百度网盘加速缓存；
+- pip、npm、NuGet、Gradle 可重建缓存；Maven 本地仓库只分析；
+- WPS、百度网盘加速缓存；Office 文档缓存只分析，避免丢失未上传文档；
 - VS Code、Discord、经典 Teams 的明确缓存子目录；
+- Epic Games 启动器官方列出的 webcache 目录，不包含游戏与存档；
 - 使用 Windows Shell API 独立查询/清空回收站；
-- 只读分析系统盘目录和达到 500 MB / 1 GB / 5 GB 阈值的大文件；
+- 只读分析系统盘目录和达到 100 MB / 500 MB / 1 GB / 5 GB 阈值的大文件；
 - 分析 hiberfil、pagefile、swapfile、Docker/WSL 虚拟磁盘，并通过固定的 `powercfg`
   或 `DISM` 操作处理受支持项目。
 
 不直接清理：WinSxS、Windows Installer、System32、未知 AppData、Downloads、Desktop、
 用户文档、QQ/微信聊天记录、虚拟磁盘、恢复点或卷影副本。
+
+Temp 保留最近 7 天，普通缓存保留最近 1 天。CAUTION 默认不勾选；已知相关应用运行时
+跳过对应清理，进程检测失败也跳过。浏览器离线站点 `Service Worker/CacheStorage`
+保留。Windows 删除使用同一句柄复核卷、文件 ID、大小、修改时间、最终路径和链接数；
+遇到写入占用、身份变化或硬链接不会退回路径删除。
+
+重复文件页由用户选择目录，默认比较 ≥ 1 MB 文件，最多检查 10 万文件；先比大小、
+首尾采样，再比完整 SHA-256。硬链接不计作重复；仅分析，不自动选择或删除副本。
+大文件表筛选当前扫描中达到阈值的前 1000 项，目录树按展开加载。
 
 ## 桌面版
 
@@ -103,6 +124,7 @@ python -m cdrive_cleaner analyze --top 20 --large-file-mb 500
 python -m cdrive_cleaner analyze --cached
 python -m cdrive_cleaner clean --rule user_temp
 python -m cdrive_cleaner clean --rule user_temp --execute --confirm CLEAN
+python -m cdrive_cleaner clean --rule baidu_accelerate_cache --execute --confirm CLEAN --confirm-rule "baidu_accelerate_cache=清理百度缓存"
 python -m cdrive_cleaner recycle-bin
 python -m cdrive_cleaner recycle-bin --empty --confirm "EMPTY RECYCLE BIN"
 python -m cdrive_cleaner advanced inspect
@@ -143,5 +165,5 @@ CLI 的 `clean` 默认 Dry Run 是给开发、自动化和诊断使用的保护�
 
 ## 安全声明
 
-当前仍是未签名 Beta 候选版，并非正式稳定版。CLI 保留 Dry Run 供自动化与技术复核；GUI
+当前仍是未签名个人 Beta，尚未证明在全部应用版本上兼容。CLI 保留 Dry Run 供自动化与技术复核；GUI
 采用“扫描 → 选择 → 一次确认 → 真实清理 → 验证”的流程。

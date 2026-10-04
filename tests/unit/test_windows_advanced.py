@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -66,3 +67,24 @@ def test_inspector_finds_only_known_large_consumers(tmp_path: Path) -> None:
     folders = KnownFolders(tmp_path / "Windows", tmp_path, local, tmp_path, tmp_path)
     findings = WindowsAdvancedInspector().inspect(folders)
     assert [item.category for item in findings] == ["hibernation", "wsl", "docker"]
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows system-directory API")
+@pytest.mark.parametrize("executable", ["dism.exe", "powercfg.exe", "vssadmin.exe"])
+def test_native_runner_resolves_trusted_absolute_executable(
+    monkeypatch: pytest.MonkeyPatch, executable: str
+) -> None:
+    from cdrive_cleaner.executors import windows_advanced
+
+    def fake_run(command: list[str], **options: object) -> subprocess.CompletedProcess[str]:
+        path = Path(command[0])
+        assert path.is_absolute()
+        assert path.parent.name.casefold() == "system32"
+        assert path.name == executable
+        assert options["shell"] is False
+        if executable == "vssadmin.exe":
+            assert command[-1] == f"/for={path.drive}"
+        return subprocess.CompletedProcess(command, 0, "captured; not executed", "")
+
+    monkeypatch.setattr(windows_advanced.subprocess, "run", fake_run)
+    assert windows_advanced._run((executable, "/for=Z:"), 10).returncode == 0

@@ -5,12 +5,17 @@ $installer = Get-ChildItem "$PSScriptRoot\..\dist\CDriveCleaner-Setup-*-unsigned
   Select-Object -First 1
 if (-not $installer) { throw "Installer was not found." }
 
-$testRoot = Join-Path $env:RUNNER_TEMP "CDriveCleanerInstallTest"
-if (Test-Path $testRoot) { Remove-Item -LiteralPath $testRoot -Recurse -Force }
+if (-not $env:RUNNER_TEMP) { throw 'Installer smoke requires an isolated CI runner temp directory.' }
+$runnerRoot = (Resolve-Path -LiteralPath $env:RUNNER_TEMP).Path
+$testRoot = [IO.Path]::GetFullPath((Join-Path $runnerRoot ("CDriveCleanerInstallTest-" + [guid]::NewGuid().ToString('N'))))
+if (-not $testRoot.StartsWith($runnerRoot.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) {
+  throw 'Installer smoke target escaped the runner temp directory.'
+}
+if (Test-Path -LiteralPath $testRoot) { throw 'Installer smoke target must not already exist.' }
 
 $process = Start-Process $installer.FullName -ArgumentList @(
   "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$testRoot"
-) -Wait -PassThru
+) -WindowStyle Hidden -Wait -PassThru
 if ($process.ExitCode -ne 0) { throw "Silent install failed with exit code $($process.ExitCode)." }
 
 $installedExe = Join-Path $testRoot "CDriveCleaner.exe"
@@ -20,7 +25,7 @@ if (-not (Test-Path $uninstaller)) { throw "Uninstaller is missing." }
 
 $process = Start-Process $uninstaller -ArgumentList @(
   "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"
-) -Wait -PassThru
+) -WindowStyle Hidden -Wait -PassThru
 if ($process.ExitCode -ne 0) { throw "Silent uninstall failed with exit code $($process.ExitCode)." }
 if (Test-Path $installedExe) { throw "Installed executable remains after uninstall." }
 

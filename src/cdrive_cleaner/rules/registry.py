@@ -29,6 +29,8 @@ class RuleSpec:
     requires_confirmation: bool = False
     confirmation_phrase: str = ""
     default_selected: bool = True
+    min_age_days: int = 0
+    blocking_processes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.rule_id or not self.rule_id.replace("_", "").isalnum():
@@ -48,6 +50,8 @@ class RuleSpec:
             raise ValueError("confirmation rules require a non-empty phrase")
         if self.risk >= RiskLevel.MANUAL and self.default_selected:
             raise ValueError("MANUAL, SYSTEM, and PROTECTED rules cannot be selected by default")
+        if self.min_age_days < 0:
+            raise ValueError("minimum age cannot be negative")
 
 
 class RuleRegistry:

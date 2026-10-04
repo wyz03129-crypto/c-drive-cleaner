@@ -10,6 +10,8 @@ from cdrive_cleaner.windows import KnownFolders
 
 from .registry import RuleRegistry, RuleSpec
 
+CATALOG_RULE_VERSION = "2.0.0"
+
 
 def _direct(
     rule_id: str,
@@ -23,11 +25,13 @@ def _direct(
     description: str = "可由应用重新生成的缓存文件",
     recommended_action: str = "关闭相关应用后清理",
     confirmation_phrase: str = "",
-    default_selected: bool = True,
+    default_selected: bool | None = None,
+    min_age_days: int = 1,
+    blocking_processes: tuple[str, ...] = (),
 ) -> RuleSpec:
     return RuleSpec(
         rule_id,
-        "1.0.0",
+        CATALOG_RULE_VERSION,
         title,
         risk,
         ActionKind.DIRECT_FILE_DELETE,
@@ -40,7 +44,9 @@ def _direct(
         recommended_action,
         bool(confirmation_phrase),
         confirmation_phrase,
-        default_selected,
+        risk is RiskLevel.SAFE if default_selected is None else default_selected,
+        min_age_days,
+        blocking_processes,
     )
 
 
@@ -85,7 +91,6 @@ def _chromium_cache_roots(user_data: Path) -> tuple[Path, ...]:
         Path("GPUCache"),
         Path("DawnCache"),
         Path("GraphiteDawnCache"),
-        Path("Service Worker/CacheStorage"),
     )
     return tuple(profile / child for profile in profiles for child in cache_children)
 
@@ -104,6 +109,7 @@ def build_m2_registry(folders: KnownFolders) -> RuleRegistry:
             (local / "Temp",),
             category="临时文件",
             description="当前用户的临时工作文件；占用中的文件会跳过",
+            min_age_days=7,
         ),
         _direct(
             "windows_temp",
@@ -112,6 +118,7 @@ def build_m2_registry(folders: KnownFolders) -> RuleRegistry:
             elevated=True,
             category="Windows 缓存",
             description="Windows 公共临时目录；需要管理员权限",
+            min_age_days=7,
         ),
         _direct(
             "chromium_cache",
@@ -120,6 +127,7 @@ def build_m2_registry(folders: KnownFolders) -> RuleRegistry:
             risk=RiskLevel.CAUTION,
             category="浏览器缓存",
             description="网页资源缓存，不包含密码、书签、Cookie 或浏览历史",
+            blocking_processes=("chrome.exe",),
         ),
         _direct(
             "edge_cache",
@@ -128,6 +136,7 @@ def build_m2_registry(folders: KnownFolders) -> RuleRegistry:
             risk=RiskLevel.CAUTION,
             category="浏览器缓存",
             description="网页资源缓存，不包含密码、书签、Cookie 或浏览历史",
+            blocking_processes=("msedge.exe",),
         ),
         _direct(
             "firefox_cache",
@@ -136,6 +145,7 @@ def build_m2_registry(folders: KnownFolders) -> RuleRegistry:
             risk=RiskLevel.CAUTION,
             category="浏览器缓存",
             description="网页资源缓存，不包含密码、书签、Cookie 或浏览历史",
+            blocking_processes=("firefox.exe",),
         ),
         _direct(
             "thumbnail_cache",
@@ -150,6 +160,8 @@ def build_m2_registry(folders: KnownFolders) -> RuleRegistry:
             "DirectX 着色器缓存",
             (local / "D3DSCache",),
             category="Windows 缓存",
+            risk=RiskLevel.CAUTION,
+            description="清理后游戏首次运行可能重新编译着色器并出现短暂卡顿",
         ),
         _direct(
             "crash_dumps",
@@ -157,6 +169,8 @@ def build_m2_registry(folders: KnownFolders) -> RuleRegistry:
             (local / "CrashDumps",),
             category="日志与崩溃文件",
             description="仅用于故障诊断的应用崩溃转储",
+            risk=RiskLevel.CAUTION,
+            min_age_days=7,
         ),
         _direct(
             "error_reports",
@@ -165,19 +179,56 @@ def build_m2_registry(folders: KnownFolders) -> RuleRegistry:
             elevated=True,
             category="日志与崩溃文件",
             description="Windows 已归档的错误报告",
-        ),
-        _direct("pip_cache", "pip 可重建缓存", (local / "pip/Cache",)),
-        _direct("npm_cache", "npm 可重建缓存", (local / "npm-cache",)),
-        _direct("nuget_cache", "NuGet 可重建缓存", (profile / ".nuget/packages",)),
-        _direct("gradle_cache", "Gradle 可重建缓存", (profile / ".gradle/caches",)),
-        _direct("maven_cache", "Maven 可重建缓存", (profile / ".m2/repository",)),
-        _direct(
-            "office_cache",
-            "Office 文档缓存",
-            (local / "Microsoft/Office/16.0/OfficeFileCache",),
             risk=RiskLevel.CAUTION,
-            category="Office 缓存",
-            description="Office 文档缓存；不包含用户文档",
+            min_age_days=7,
+        ),
+        _direct(
+            "pip_cache",
+            "pip 下载缓存",
+            (local / "pip/Cache",),
+            risk=RiskLevel.CAUTION,
+            blocking_processes=("pip.exe", "python.exe", "pythonw.exe"),
+        ),
+        _direct(
+            "npm_cache",
+            "npm 下载缓存",
+            (local / "npm-cache/_cacache",),
+            risk=RiskLevel.CAUTION,
+            blocking_processes=("node.exe",),
+        ),
+        _direct(
+            "nuget_cache",
+            "NuGet 可重建缓存",
+            (profile / ".nuget/packages",),
+            risk=RiskLevel.CAUTION,
+            blocking_processes=("dotnet.exe", "devenv.exe", "msbuild.exe"),
+        ),
+        _direct(
+            "gradle_cache",
+            "Gradle 可重建缓存",
+            (profile / ".gradle/caches",),
+            risk=RiskLevel.CAUTION,
+            blocking_processes=("java.exe", "javaw.exe", "studio64.exe"),
+        ),
+        RuleSpec(
+            "maven_cache",
+            CATALOG_RULE_VERSION,
+            "Maven 本地仓库（仅分析）",
+            RiskLevel.MANUAL,
+            ActionKind.ADVISORY_ONLY,
+            (profile / ".m2/repository",),
+            description="可能包含本地安装且无法重新下载的构建产物；请在 Maven 中管理",
+            default_selected=False,
+        ),
+        RuleSpec(
+            "office_cache",
+            CATALOG_RULE_VERSION,
+            "Office 文档缓存（仅分析）",
+            RiskLevel.MANUAL,
+            ActionKind.ADVISORY_ONLY,
+            (local / "Microsoft/Office/16.0/OfficeFileCache",),
+            description="可能包含尚未上传的文档；请完成同步并使用 Office 自带缓存管理",
+            default_selected=False,
         ),
         _direct(
             "wps_cache",
@@ -186,6 +237,7 @@ def build_m2_registry(folders: KnownFolders) -> RuleRegistry:
             risk=RiskLevel.CAUTION,
             category="Office 缓存",
             description="WPS 明确命名的缓存目录；不包含用户文档或备份",
+            blocking_processes=("wps.exe", "et.exe", "wpp.exe", "wpscloudsvr.exe"),
         ),
         _direct(
             "baidu_accelerate_cache",
@@ -195,6 +247,7 @@ def build_m2_registry(folders: KnownFolders) -> RuleRegistry:
             description="百度网盘可重新生成的加速缓存；不包含云端文件",
             confirmation_phrase="清理百度缓存",
             default_selected=False,
+            blocking_processes=("baidunetdisk.exe", "baidunetdiskhost.exe", "baiduyunkernel.exe"),
         ),
         _direct(
             "vscode_cache",
@@ -206,6 +259,7 @@ def build_m2_registry(folders: KnownFolders) -> RuleRegistry:
             risk=RiskLevel.CAUTION,
             category="开发工具缓存",
             description="编辑器可重建缓存；不包含设置、扩展或项目",
+            blocking_processes=("code.exe",),
             default_selected=False,
         ),
         _direct(
@@ -217,6 +271,7 @@ def build_m2_registry(folders: KnownFolders) -> RuleRegistry:
             ),
             risk=RiskLevel.CAUTION,
             description="Discord 界面资源缓存；不包含账号和聊天数据",
+            blocking_processes=("discord.exe",),
             default_selected=False,
         ),
         _direct(
@@ -227,7 +282,19 @@ def build_m2_registry(folders: KnownFolders) -> RuleRegistry:
             ),
             risk=RiskLevel.CAUTION,
             description="Teams 经典版界面缓存；不包含下载文件或账号配置",
+            blocking_processes=("teams.exe",),
             default_selected=False,
+        ),
+        _direct(
+            "epic_webcache",
+            "Epic Games 启动器网页缓存",
+            tuple(
+                local / "EpicGamesLauncher/Saved" / name
+                for name in ("webcache", "webcache_4147", "webcache_4430")
+            ),
+            risk=RiskLevel.CAUTION,
+            description="启动器网页缓存；重新打开时会重建，可能需重新登录；不包含游戏与存档",
+            blocking_processes=("epicgameslauncher.exe", "epicwebhelper.exe"),
         ),
     )
     return RuleRegistry(rules)

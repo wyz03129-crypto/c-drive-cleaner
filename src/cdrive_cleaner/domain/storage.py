@@ -48,6 +48,7 @@ class StorageSnapshot:
     top_files: tuple[LargeFile, ...]
     coverage: AnalysisCoverage
     cancelled: bool
+    unreadable_paths: tuple[Path, ...] = ()
 
     def children_of(self, parent: Path) -> tuple[DirectoryUsage, ...]:
         """Return direct children for UI/CLI drill-down without rescanning."""
