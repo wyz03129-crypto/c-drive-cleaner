@@ -58,7 +58,12 @@ def main() -> int:
             window.show()
             tabs = window.centralWidget()
             assert isinstance(tabs, QTabWidget)
-            for index, name in ((1, "quick-clean"), (2, "analysis"), (4, "advanced")):
+            for index, name in (
+                (1, "quick-clean"),
+                (2, "analysis"),
+                (4, "advanced"),
+                (6, "recovery"),
+            ):
                 tabs.setCurrentIndex(index)
                 app.processEvents()
                 assert window.grab().save(str(args.previews / f"{name}.png"))

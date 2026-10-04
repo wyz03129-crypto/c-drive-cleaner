@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.2.0 beta 1 — recoverable cache cleanup
+
+- Added cross-volume backup-before-delete and current-user DPAPI recovery manifests.
+- Verified payload and flushed manifest before deleting through the same locked source handle.
+- Added vault locking, quota/free-space checks, conflict-free restoration, cancellation,
+  named-stream/EFS rejection, incomplete-record visibility and explicit backup purge.
+- GUI defaults to recoverable mode; permanent cleanup remains an explicit alternative.
+- Added CLI recovery commands, QUARANTINED outcomes and recovery identifiers.
+- Scope and limitations, including simulated cross-volume tests, documented separately.
+
 ## 2.1.0 beta 1 — personal deep analysis
 
 - Added lazy directory drill-down, top-1000 large-file path/extension/risk filters,

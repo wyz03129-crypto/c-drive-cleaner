@@ -98,6 +98,9 @@ def test_window_busy_manual_rows_and_cancellation(
     monkeypatch.setattr(main_window, "load_history", lambda: ())
     app = QApplication.instance() or QApplication([])
     window = main_window.MainWindow()
+    assert window.cleanup_mode.currentIndex() == 0
+    assert window._vault_root is None
+    assert not window.recovery_cancel.isEnabled()
     office = folders.local_app_data / "Microsoft/Office/16.0/OfficeFileCache/pending.bin"
     office.parent.mkdir(parents=True)
     office.write_bytes(b"pending")
@@ -120,3 +123,71 @@ def test_window_busy_manual_rows_and_cancellation(
     assert window.scan_button.isEnabled()
     window.close()
     assert app is not None
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Native Windows GUI recovery")
+def test_gui_backup_restore_and_explicit_purge(tmp_path, monkeypatch):
+    import time
+    from dataclasses import replace
+
+    from cdrive_cleaner.executors import quarantine
+    from cdrive_cleaner.ui import main_window
+    from cdrive_cleaner.windows import KnownFolders
+
+    folders = KnownFolders(
+        *(tmp_path / name for name in ("Windows", "User", "Local", "Roam", "Data"))
+    )
+    monkeypatch.setattr(main_window, "discover_known_folders", lambda: folders)
+    monkeypatch.setattr(main_window, "load_history", lambda: ())
+    monkeypatch.setattr(main_window, "append_history", lambda receipt: None)
+    monkeypatch.setattr(
+        main_window.QFileDialog, "getExistingDirectory", lambda *args: str(tmp_path)
+    )
+    monkeypatch.setattr(
+        main_window.QMessageBox,
+        "question",
+        lambda *args: main_window.QMessageBox.StandardButton.Yes,
+    )
+    monkeypatch.setattr(main_window.QInputDialog, "getText", lambda *args: ("删除备份", True))
+    target = folders.local_app_data / "Temp/old.tmp"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"restorable GUI fixture")
+    old = time.time() - 8 * 86400
+    os.utime(target, (old, old))
+    app = QApplication.instance() or QApplication([])
+    window = main_window.MainWindow()
+    reference = quarantine.file_reference
+    monkeypatch.setattr(
+        quarantine,
+        "file_reference",
+        lambda path: (
+            replace(reference(path), volume=reference(path).volume ^ 1)
+            if path.name == "CDriveCleaner-Quarantine"
+            else reference(path)
+        ),
+    )
+
+    def completed():
+        assert window._pool.waitForDone(5000)
+        app.processEvents()
+        assert not window._busy
+
+    window._choose_vault()
+    completed()
+    window._start_quick_scan()
+    completed()
+    window._confirm_clean()
+    completed()
+    assert not target.exists()
+    window._load_recovery()
+    completed()
+    assert window.recovery_table.rowCount() == 1
+    window.recovery_table.selectRow(0)
+    window._restore_recovery()
+    completed()
+    assert target.read_bytes() == b"restorable GUI fixture"
+    window.recovery_table.selectRow(0)
+    window._purge_recovery()
+    completed()
+    assert target.exists() and window.recovery_table.rowCount() == 0
+    window.close()

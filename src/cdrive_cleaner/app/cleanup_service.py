@@ -7,10 +7,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
-from cdrive_cleaner.domain import ActionPlan, CleanupReceipt
-from cdrive_cleaner.executors import DirectFileDeleteExecutor
+from cdrive_cleaner.domain import ActionPlan, CleanupReceipt, PlannedAction
+from cdrive_cleaner.executors.models import ExecutionResult
 
 FreeSpaceReader = Callable[[Path], int]
+
+
+class FileExecutor(Protocol):
+    def execute(self, action: PlannedAction, *, dry_run: bool) -> ExecutionResult: ...
 
 
 class CancellationSignal(Protocol):
@@ -23,7 +27,7 @@ class CancellationSignal(Protocol):
 class CleanupCoordinator:
     def __init__(
         self,
-        executor: DirectFileDeleteExecutor,
+        executor: FileExecutor,
         *,
         free_space_reader: FreeSpaceReader,
     ) -> None:

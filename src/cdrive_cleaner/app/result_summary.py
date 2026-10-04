@@ -5,6 +5,7 @@ from collections import Counter
 from cdrive_cleaner.domain import CleanupReceipt
 
 REASONS = {
+    "backup_not_completed": "备份/校验未完成，原文件未确认删除；请检查隔离盘空间、卷、权限及记录",
     "application_running": "相关应用仍在运行：完全退出后重新扫描",
     "process_state_unknown": "无法确认应用状态：本次跳过",
     "elevation_required": "需要管理员权限",

@@ -48,6 +48,7 @@ def main() -> int:
         for name in (
             "PERSONAL_QUICKSTART.md",
             "PERSONAL_2_1_ACCEPTANCE.md",
+            "PERSONAL_2_2_ACCEPTANCE.md",
             "THIRD_PARTY_NOTICES.md",
         ):
             archive.write(ROOT / "docs" / name, name)

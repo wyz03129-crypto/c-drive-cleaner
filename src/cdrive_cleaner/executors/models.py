@@ -10,6 +10,7 @@ from cdrive_cleaner.safety import AuthorizationCode
 
 class ExecutionStatus(StrEnum):
     DELETED = "deleted"
+    QUARANTINED = "quarantined"
     SIMULATED = "simulated"
     DENIED = "denied"
     SKIPPED = "skipped"
@@ -22,3 +23,4 @@ class ExecutionResult:
     bytes_attempted: int = 0
     authorization_code: AuthorizationCode | None = None
     error_code: str | None = None
+    recovery_id: str | None = None

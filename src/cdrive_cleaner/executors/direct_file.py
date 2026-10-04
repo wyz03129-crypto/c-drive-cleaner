@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from pathlib import Path
 
-from cdrive_cleaner.domain import ActionKind, PlannedAction
+from cdrive_cleaner.domain import ActionKind, FileIdentity, PlannedAction
 from cdrive_cleaner.rules import RuleRegistry
 from cdrive_cleaner.rules.predicates import matches_file
 from cdrive_cleaner.safety import AuthorizationCode, SafetyPolicy, capture_identity
@@ -22,11 +23,13 @@ class DirectFileDeleteExecutor:
         elevated_checker: Callable[[], bool] | None = None,
         registry: RuleRegistry | None = None,
         process_checker: Callable[[tuple[str, ...]], bool] | None = None,
+        verified_delete: Callable[[Path, FileIdentity], None] = delete_verified_file,
     ) -> None:
         self._policy = policy
         self._elevated_checker = elevated_checker or (lambda: False)
         self._registry = registry
         self._process_checker = process_checker or ProcessGuard()
+        self._verified_delete = verified_delete
 
     def execute(self, action: PlannedAction, *, dry_run: bool) -> ExecutionResult:
         finding = action.finding
@@ -102,7 +105,7 @@ class DirectFileDeleteExecutor:
                     final_identity.size,
                     final_identity.size,
                 )
-            delete_verified_file(decision.normalized.absolute, final_identity)
+            self._verified_delete(decision.normalized.absolute, final_identity)
             return ExecutionResult(
                 ExecutionStatus.DELETED,
                 final_identity.size,

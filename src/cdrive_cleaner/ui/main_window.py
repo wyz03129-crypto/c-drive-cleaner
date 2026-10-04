@@ -50,6 +50,7 @@ from cdrive_cleaner.executors import (
     RecycleBinExecutor,
     WindowsAdvancedExecutor,
 )
+from cdrive_cleaner.executors.quarantine import QuarantineExecutor, QuarantineStore, RecoveryEntry
 from cdrive_cleaner.persistence import append_history, export_diagnostics, load_history
 from cdrive_cleaner.rules import build_m2_registry
 from cdrive_cleaner.safety import SafetyPolicy
@@ -82,6 +83,7 @@ class MainWindow(QMainWindow):
         self._workers: set[FunctionWorker] = set()
         self._busy = False
         self._progress = (0, 0)
+        self._vault_root: Path | None = None
         self._folders = discover_known_folders()
         self._registry = build_m2_registry(self._folders)
         self._policy = SafetyPolicy(
@@ -102,7 +104,127 @@ class MainWindow(QMainWindow):
         tabs.addTab(self._duplicates(), "重复文件")
         tabs.addTab(self._advanced(), "高级优化")
         tabs.addTab(self._history(), "清理历史")
+        tabs.addTab(self._recovery(), "隔离与恢复")
         return tabs
+
+    def _recovery(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        note = QLabel(
+            "选择其他磁盘上的私人文件夹作为隔离区。恢复记录绑定本机 Windows 用户；"
+            "备份内容未加密，请勿放入共享/同步文件夹。默认总配额 10 GB，不自动过期删除。"
+        )
+        note.setWordWrap(True)
+        layout.addWidget(note)
+        self.vault_label = QLabel("尚未选择隔离区")
+        self.vault_label.setWordWrap(True)
+        layout.addWidget(self.vault_label)
+        buttons = QHBoxLayout()
+        for label, callback in (
+            ("选择/打开隔离区", self._choose_vault),
+            ("刷新记录", self._load_recovery),
+            ("恢复所选备份", self._restore_recovery),
+            ("永久删除所选备份", self._purge_recovery),
+        ):
+            button = QPushButton(label)
+            button.clicked.connect(callback)
+            buttons.addWidget(button)
+        layout.addLayout(buttons)
+        self.recovery_cancel = QPushButton("取消恢复（保留备份）")
+        self.recovery_cancel.setEnabled(False)
+        self.recovery_cancel.clicked.connect(self._cancel)
+        layout.addWidget(self.recovery_cancel)
+        self.recovery_table = QTableWidget(0, 4)
+        self.recovery_table.setHorizontalHeaderLabels(("原文件", "大小", "状态", "备份时间"))
+        self.recovery_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.recovery_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.recovery_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.recovery_table.setColumnWidth(0, 350)
+        self.recovery_table.horizontalHeader().setStretchLastSection(True)
+        layout.addWidget(self.recovery_table)
+        return page
+
+    def _choose_vault(self) -> None:
+        folder = QFileDialog.getExistingDirectory(self, "选择其他盘的私人文件夹或已有隔离区")
+        if not folder:
+            return
+        root = Path(folder)
+        if root.name != "CDriveCleaner-Quarantine":
+            root /= "CDriveCleaner-Quarantine"
+        self._vault_root = root
+        self.vault_label.setText(str(root))
+
+        def initialize() -> tuple[RecoveryEntry, ...]:
+            store = QuarantineStore(root)
+            store.initialize()
+            return store.entries()
+
+        self._run(initialize, self._recovery_loaded)
+
+    def _load_recovery(self) -> None:
+        if self._vault_root is not None:
+            root = self._vault_root
+            self._run(lambda: QuarantineStore(root).entries(), self._recovery_loaded)
+
+    def _recovery_loaded(self, entries: Any) -> None:
+        self.recovery_table.setRowCount(len(entries))
+        for row, entry in enumerate(entries):
+            for col, value in enumerate(
+                (entry.original or entry.entry_id, _size(entry.size), entry.state, entry.created)
+            ):
+                cell = QTableWidgetItem(value)
+                cell.setData(Qt.ItemDataRole.UserRole, entry.entry_id)
+                cell.setToolTip(value)
+                self.recovery_table.setItem(row, col, cell)
+
+    def _recovery_selection(self) -> tuple[QuarantineStore, str] | None:
+        row = self.recovery_table.currentRow()
+        cell = self.recovery_table.item(row, 0)
+        if self._vault_root is None or cell is None:
+            QMessageBox.information(self, "未选择备份", "请先打开隔离区并选择一条记录。")
+            return None
+        return QuarantineStore(self._vault_root), str(cell.data(Qt.ItemDataRole.UserRole))
+
+    def _restore_recovery(self) -> None:
+        selected = self._recovery_selection()
+        if selected is None:
+            return
+        answer = QMessageBox.question(
+            self,
+            "确认恢复",
+            "恢复到原路径，不覆盖已有文件；会重新占用原磁盘空间。请先关闭相关应用。",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        store, entry_id = selected
+        token = CancellationToken()
+        self._token = token
+        self.recovery_cancel.setEnabled(True)
+
+        def restore() -> tuple[RecoveryEntry, ...]:
+            store.restore(entry_id, self._registry, self._policy, token=token)
+            return store.entries()
+
+        self._run(restore, self._recovery_loaded)
+
+    def _purge_recovery(self) -> None:
+        selected = self._recovery_selection()
+        if selected is None:
+            return
+        phrase, accepted = QInputDialog.getText(
+            self, "永久删除备份", "本操作只删除所选备份，之后不能用它恢复原文件。请输入：删除备份"
+        )
+        if not accepted or phrase != "删除备份":
+            return
+        store, entry_id = selected
+
+        def purge() -> tuple[RecoveryEntry, ...]:
+            store.purge(entry_id, confirmation="DELETE BACKUP")
+            return store.entries()
+
+        self._run(purge, self._recovery_loaded)
 
     def _duplicates(self) -> QWidget:
         page, layout = QWidget(), QVBoxLayout()
@@ -195,6 +317,9 @@ class MainWindow(QMainWindow):
         self.quick_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.quick_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         layout.addLayout(buttons)
+        self.cleanup_mode = QComboBox()
+        self.cleanup_mode.addItems(("备份后清理（可恢复，需其他盘隔离区）", "永久清理（不可恢复）"))
+        layout.addWidget(self.cleanup_mode)
         layout.addWidget(self.quick_status)
         layout.addWidget(self.quick_table)
         self.cleanup_details = QTextEdit()
@@ -381,6 +506,19 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "没有选择", "请选择至少一个清理类别。")
             return
         chosen = [r for r in self._registry.all() if r.rule_id in selected]
+        recoverable = self.cleanup_mode.currentIndex() == 0
+        if recoverable and self._vault_root is None:
+            QMessageBox.information(
+                self, "需要隔离区", "请先在“隔离与恢复”页选择其他磁盘上的私人文件夹。"
+            )
+            return
+        if recoverable and any(rule.requires_elevation for rule in chosen):
+            QMessageBox.information(
+                self,
+                "不支持该备份类别",
+                "可恢复模式暂不处理需要管理员的类别。请取消勾选，或明确改用永久清理模式。",
+            )
+            return
         if any(r.requires_elevation for r in chosen) and not self._ensure_elevated():
             return
         estimate = sum(f.identity.size for f in self._snapshot.findings if f.rule_id in selected)
@@ -389,7 +527,12 @@ class MainWindow(QMainWindow):
             "确认清理",
             f"选择 {len(chosen)} 类，预计 {_size(estimate)}。\n"
             + "\n".join(f"{r.title}：{r.description}" for r in chosen)
-            + "\n将永久删除所选缓存，不能撤销。运行中的应用、占用或复核失败的文件会跳过。继续？",
+            + (
+                "\n先备份到其他卷并校验，再清理原文件；可在隔离页恢复。"
+                if recoverable
+                else "\n将永久删除所选缓存，不能撤销。"
+            )
+            + "运行中的应用、占用或复核失败的文件会跳过。继续？",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -409,16 +552,20 @@ class MainWindow(QMainWindow):
         plan = CleanupPlanner(self._registry).build(
             finding for finding in self._snapshot.findings if finding.rule_id in selected
         )
-        service = CleanupCoordinator(
-            DirectFileDeleteExecutor(
-                self._policy, elevated_checker=is_process_elevated, registry=self._registry
-            ),
-            free_space_reader=free_bytes,
-        )
         self.clean_button.setEnabled(False)
         self.cancel_button.setEnabled(True)
         self._token = CancellationToken()
         token = self._token
+        executor = (
+            QuarantineExecutor(
+                QuarantineStore(self._vault_root), self._policy, self._registry, token=token
+            )
+            if recoverable and self._vault_root is not None
+            else DirectFileDeleteExecutor(
+                self._policy, elevated_checker=is_process_elevated, registry=self._registry
+            )
+        )
+        service = CleanupCoordinator(executor, free_space_reader=free_bytes)
         self.quick_status.setText("正在清理……")
         self._run(
             lambda: service.execute(
@@ -623,9 +770,15 @@ class MainWindow(QMainWindow):
     def _set_busy(self, busy: bool) -> None:
         self._busy = busy
         for button in self.findChildren(QPushButton):
-            if button not in (self.cancel_button, self.analysis_cancel, self.duplicate_cancel):
+            if button not in (
+                self.cancel_button,
+                self.analysis_cancel,
+                self.duplicate_cancel,
+                self.recovery_cancel,
+            ):
                 button.setEnabled(not busy)
         self.quick_table.setEnabled(not busy)
+        self.cleanup_mode.setEnabled(not busy)
         self.clean_button.setEnabled(not busy and self._snapshot is not None)
 
     def _worker_finished(self, _value: object) -> None:
@@ -633,6 +786,7 @@ class MainWindow(QMainWindow):
         self.cancel_button.setEnabled(False)
         self.analysis_cancel.setEnabled(False)
         self.duplicate_cancel.setEnabled(False)
+        self.recovery_cancel.setEnabled(False)
 
     def _analysis_progress(self, count: int, size: int) -> None:
         self._progress = (count, size)
@@ -658,6 +812,8 @@ class MainWindow(QMainWindow):
                 datetime.fromisoformat(entry.finished_at).astimezone().strftime("%Y-%m-%d %H:%M")
             )
             result = f"成功 {entry.succeeded}，跳过/失败 {entry.skipped_or_failed}"
+            if entry.quarantined:
+                result += f"（备份后清理 {entry.quarantined}）"
             if entry.cancelled:
                 result += "（已取消）"
             values = (

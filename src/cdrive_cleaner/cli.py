@@ -6,6 +6,7 @@ import argparse
 import shutil
 from collections.abc import Sequence
 from contextlib import suppress
+from pathlib import Path
 
 from . import __version__
 from .analysis import FastScanner, StorageAnalyzer, WindowsAdvancedInspector, advise_path
@@ -14,6 +15,7 @@ from .app.result_summary import failure_summary
 from .domain import AdvancedAction
 from .domain.errors import SafetyDeniedError, UnsupportedPlatformError
 from .executors import DirectFileDeleteExecutor, RecycleBinExecutor, WindowsAdvancedExecutor
+from .executors.quarantine import QuarantineExecutor, QuarantineStore
 from .persistence import StorageSnapshotCache
 from .rules import RuleRegistry, build_m2_registry
 from .safety import SafetyPolicy
@@ -47,9 +49,15 @@ def build_parser() -> argparse.ArgumentParser:
     clean.add_argument("--rule", action="append", required=True, help="选择规则 ID，可重复")
     clean.add_argument("--execute", action="store_true", help="执行真实清理；省略时为 Dry Run")
     clean.add_argument("--confirm", help="真实清理必须精确输入 CLEAN")
+    clean.add_argument("--quarantine", type=Path, help="备份后清理：其他卷的专用隔离目录")
     clean.add_argument(
         "--confirm-rule", action="append", default=[], help="专项确认，格式 rule_id=确认词，可重复"
     )
+    recovery = subcommands.add_parser("recovery", help="隔离区初始化、列表、恢复和永久删除备份")
+    recovery.add_argument("operation", choices=("init", "list", "restore", "purge"))
+    recovery.add_argument("--root", required=True, type=Path)
+    recovery.add_argument("--id")
+    recovery.add_argument("--confirm", default="")
     recycle = subcommands.add_parser("recycle-bin", help="独立查询或清空 C 盘回收站")
     recycle.add_argument("--empty", action="store_true", help="清空回收站；省略时只查询")
     recycle.add_argument("--confirm", help="清空时必须精确输入 EMPTY RECYCLE BIN")
@@ -87,6 +95,31 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command == "recovery":
+        try:
+            store = QuarantineStore(args.root)
+            if args.operation == "init":
+                if args.confirm != "INIT BACKUP":
+                    parser.error("初始化需 --confirm 'INIT BACKUP'")
+                store.initialize()
+            elif args.operation in {"restore", "purge"}:
+                if not args.id:
+                    parser.error("需要 --id 指定一条备份")
+                if args.operation == "restore":
+                    if args.confirm != "RESTORE":
+                        parser.error("恢复需 --confirm RESTORE")
+                    _, registry, policy = _runtime()
+                    store.restore(args.id, registry, policy)
+                else:
+                    store.purge(args.id, confirmation=args.confirm)
+            for entry in store.entries():
+                print(
+                    f"{entry.entry_id}  {entry.state}  {_format_bytes(entry.size)}  "
+                    f"{entry.original}"
+                )
+            return 0
+        except (OSError, ValueError) as error:
+            parser.error(str(error))
     if args.command == "status":
         print("C Drive Cleaner v2：M5 GUI、空间分析、安全清理和高级优化已启用。")
         return 0
@@ -218,13 +251,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         plan = CleanupPlanner(registry).build(
             finding for finding in quick_snapshot.findings if finding.rule_id in selected
         )
-        receipt = CleanupCoordinator(
-            DirectFileDeleteExecutor(
+        executor = (
+            QuarantineExecutor(QuarantineStore(args.quarantine), policy, registry)
+            if args.quarantine
+            else DirectFileDeleteExecutor(
                 policy, elevated_checker=is_process_elevated, registry=registry
-            ),
+            )
+        )
+        receipt = CleanupCoordinator(
+            executor,
             free_space_reader=free_bytes,
         ).execute(plan, volume=folders.system_drive, dry_run=not args.execute)
         mode = "Dry Run" if receipt.dry_run else "真实清理"
+        if args.quarantine:
+            mode += "（备份后清理模式）"
         estimate = _format_bytes(receipt.estimated_bytes)
         processed = _format_bytes(receipt.processed_bytes)
         print(f"{mode}：预计 {estimate}，处理 {processed}")

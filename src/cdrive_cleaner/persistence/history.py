@@ -26,11 +26,13 @@ class CleanupHistoryEntry:
     unattempted_bytes: int = 0
     cancelled: bool = False
     failure_details: str = ""
+    quarantined: int = 0
 
     @classmethod
     def from_receipt(cls, receipt: CleanupReceipt) -> CleanupHistoryEntry:
         succeeded = sum(
-            result.status in {ExecutionStatus.DELETED, ExecutionStatus.SIMULATED}
+            result.status
+            in {ExecutionStatus.DELETED, ExecutionStatus.QUARANTINED, ExecutionStatus.SIMULATED}
             for result in receipt.results
         )
         return cls(
@@ -47,6 +49,7 @@ class CleanupHistoryEntry:
             receipt.unattempted_bytes,
             receipt.cancelled,
             failure_summary(receipt),
+            sum(result.status is ExecutionStatus.QUARANTINED for result in receipt.results),
         )
 
 
