@@ -8,7 +8,6 @@ import json
 import platform
 import subprocess
 import sys
-import urllib.request
 import zipfile
 from pathlib import Path
 
@@ -65,12 +64,8 @@ def main() -> int:
                     path = Path(str(distribution.locate_file(file)))
                     if path.is_file() and path.suffix.casefold() in (".txt", ".md", ""):
                         archive.write(path, f"licenses/{name}/{file.name}")
-        # Build-time network only; the application itself has no network dependency.
-        for name in ("lgpl-3.0", "gpl-3.0"):
-            with urllib.request.urlopen(
-                f"https://www.gnu.org/licenses/{name}.txt", timeout=30
-            ) as response:
-                archive.writestr(f"licenses/{name}.txt", response.read())
+        for license_file in (ROOT / "packaging/licenses").glob("*.txt"):
+            archive.write(license_file, f"licenses/{license_file.name}")
     with zipfile.ZipFile(target) as archive:
         assert archive.testzip() is None
     digest = hashlib.sha256(target.read_bytes()).hexdigest()
